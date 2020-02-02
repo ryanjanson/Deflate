@@ -1,0 +1,30 @@
+#
+# Copyright (c) 2020 Ryan Janson (ryand.janson@gmail.com)
+#
+# Distributed under the Boost Software License, Version 1.0. (See accompanying
+# file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+#
+# Official repository: https://github.com/ryanjanson/deflate
+#
+
+project boost/deflate
+    : requirements
+      <link>shared:<define>BOOST_DEFLATE_DYN_LINK=1
+      <link>static:<define>BOOST_DEFLATE_STATIC_LINK=1
+    : usage-requirements
+      <link>shared:<define>BOOST_DEFLATE_DYN_LINK=1
+      <link>static:<define>BOOST_DEFLATE_STATIC_LINK=1
+    : source-location ../src
+    ;
+
+alias deflate_sources
+   : src.cpp
+   ;
+
+explicit deflate_sources ;
+
+lib boost_deflate
+   : deflate_sources
+   ;
+
+boost-install boost_deflate ;

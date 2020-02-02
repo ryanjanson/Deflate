@@ -1,0 +1,11 @@
+{
+   zlib_fill_window_no_init
+   Memcheck:Cond
+   fun:fill_window
+}
+
+{
+   zlib_deflate_fast
+   Memcheck:Cond
+   fun:deflate_fast
+}
