@@ -3,8 +3,7 @@
 #---------------------------------------------------------------------------
 
 INPUT = \
-        $(LIB_DIR)/include/boost/uri
-
+        $(LIB_DIR)/include/boost/deflate
 
 ALIASES               += esafe="@par Exception Safety"
 
@@ -36,13 +35,7 @@ INCLUDE_PATH           = ../
 INCLUDE_FILE_PATTERNS  =
 
 PREDEFINED             = \
-                        GENERATING_DOCUMENTATION \
-                        BOOST_URI_DECL \
-                        BOOST_URI_PUBLIC \
-                        BOOST_URI_FORCEINLINE \
-                        "BOOST_URI_NODISCARD=[[nodiscard]]" \
-                        "BOOST_URI_INLINE_VARIABLE(v, t)=constexpr t v;"
-
+                        GENERATING_DOCUMENTATION
 EXPAND_AS_DEFINED      =
 SKIP_FUNCTION_MACROS   = YES
 
@@ -50,9 +43,9 @@ SKIP_FUNCTION_MACROS   = YES
 # Project related configuration options
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = "URI"
+PROJECT_NAME           = "Deflate"
 PROJECT_NUMBER         =
-PROJECT_BRIEF          = URI Library
+PROJECT_BRIEF          = Deflate [De]Compression Library
 PROJECT_LOGO           =
 OUTPUT_DIRECTORY       =
 CREATE_SUBDIRS         = NO

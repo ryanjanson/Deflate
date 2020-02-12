@@ -1,23 +1,25 @@
 [/
-    Copyright (c) 2019 Vinnie Falco (vinnie.falco@gmail.com)
+    Copyright (c) 2020 Ryan Janson (ryand dot janson at gmail dot com)
+    Copyright (c) 2020 Vinnie Falco (vinnie dot falco at gmail dot com)
 
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-    Official repository: https://github.com/vinniefalco/uri
+    Official repository: https://github.com/ryanjanson/deflate
 ]
 
-[library Boost.URI
-    [id uri]
+[library Boost.Deflate
+    [id deflate]
     [quickbook 1.6]
-    [copyright 2019 Vinnie Falco]
-    [purpose URI Library]
+    [copyright 2020 Vinnie Falco]
+    [copyright 2020 Ryan Janson]
+    [purpose Data-Compression Library]
     [license
         Distributed under the Boost Software License, Version 1.0.
         (See accompanying file LICENSE_1_0.txt or copy at
         [@http://www.boost.org/LICENSE_1_0.txt])
     ]
-    [authors [Falco, Vinnie]]
+    [authors [Falco, Vinnie], [Janson, Ryan]]
     [category template]
     [category generic]
 ]
@@ -26,8 +28,8 @@
 [template indexterm1[term1] '''<indexterm><primary>'''[term1]'''</primary></indexterm>''']
 [template indexterm2[term1 term2] '''<indexterm><primary>'''[term1]'''</primary><secondary>'''[term2]'''</secondary></indexterm>''']
 
-[template include_file[path][^<'''<ulink url="https://github.com/vinniefalco/json/blob/master/include/'''[path]'''">'''[path]'''</ulink>'''>]]
-[template issue[n] '''<ulink url="https://github.com/vinniefalco/json/issues/'''[n]'''">#'''[n]'''</ulink>''']
+[template include_file[path][^<'''<ulink url="https://github.com/ryanjanson/deflate/blob/master/include/'''[path]'''">'''[path]'''</ulink>'''>]]
+[template issue[n] '''<ulink url="https://github.com/ryanjanson/deflate/issues/'''[n]'''">#'''[n]'''</ulink>''']
 
 [/ Named Requirements ]
 
@@ -39,40 +41,61 @@
 [def __InputIterator__          [@https://en.cppreference.com/w/cpp/named_req/InputIterator ['InputIterator]]]
 [def __MoveAssignable__         [@https://en.cppreference.com/w/cpp/named_req/MoveAssignable ['MoveAssignable]]]
 [def __MoveConstructible__      [@https://en.cppreference.com/w/cpp/named_req/MoveConstructible ['MoveConstructible]]]
-[def __Swappable__              [@https://en.cppreference.com/w/cpp/named_req/Swappable ['Swappable]]]
 
 [def __Copyable__               [@https://en.cppreference.com/w/cpp/concepts/copyable ['Copyable]]]
 [def __SemiRegular__            [@https://en.cppreference.com/w/cpp/concepts/semiregular ['SemiRegular]]]
 
-[/ Dingbats ]
+[/-----------------------------------------------------------------------------]
 
-[def __good__ [role green \u2714]]
-[def __bad__  [role red   \u2718]]
+[heading Introduction]
+
+This library provides an implementation of the DEFLATE compression and
+decompression algorithms for the deflate format (RFC1951), with an integration
+of the zlib format (RFC1950) as well as the gzip format (RFC1952). It is largely
+based off of the zlib library written by Jean-loup Gailly and Mark Adler, hence the APIs
+are very similar.
 
 [/-----------------------------------------------------------------------------]
 
-[import ../../test/snippets.cpp]
+[heading Motivation]
+
+The Deflate compression format is used in:
+
+* File compression, for the gzip, ZIP, and PNG formats
+* HTTP requests, for the gzip and deflate encodings, or in WebSockets
 
 [/-----------------------------------------------------------------------------]
 
-[variablelist
-    [[
-        [link uri.overview Overview]
-    ][
-        A review of the requirements and features included in Boost.URI,
-        rationale and design information, answers to frequently
-        asked questions, and credits.
-    ]]
-    [[
-        [link uri.ref Reference]
-    ][
-        Detailed function and type reference.
-    ]]
-]
+[heading Requirements]
+
+The library is usable in two different modes: standalone and Boost dependent. This library defaults to Boost dependent mode; standalone mode is opt-in through the use of a configuration macro.
+
+When in Boost dependent mode, the library requires the use of at least C++11, in addition to Boost.Core, Boost.Utility, and Boost.ContainerHash. In standalone mode, C++17 is required but no libraries except for the standard library are needed.
+
+[/-----------------------------------------------------------------------------]
+
+[heading Design]
+
+[/-----------------------------------------------------------------------------]
+
+[heading Configuration]
+
+Certain features can be enabled and disabled though defining configuration macros. The macros and the associated feature they control are:
+
+* `BOOST_DEFLATE_STANDALONE`: When defined, the library is put into standalone mode.
+
+[/-----------------------------------------------------------------------------]
+
+[heading Reference]
+
+[link deflate.ref.boost__deflate__deflate `deflate`]
+
+[/-----------------------------------------------------------------------------]
 
 [section:ref Reference]
-[xinclude quickref.xml]
 [include reference.qbk]
 [endsect]
+
+[/-----------------------------------------------------------------------------]
 
 [xinclude index.xml]

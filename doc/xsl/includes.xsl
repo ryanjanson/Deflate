@@ -10,6 +10,6 @@
     </xsl:if>
   </xsl:template>
 
-  <xsl:template mode="convenience-header" match="@file[contains(., 'boost/json')]">json.hpp</xsl:template>
+  <xsl:template mode="convenience-header" match="@file[contains(., 'boost/deflate')]">deflate.hpp</xsl:template>
   <xsl:template mode="convenience-header" match="@file"/>
 <!-- INCLUDES_FOOT_TEMPLATE END -->
