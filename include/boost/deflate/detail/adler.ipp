@@ -37,6 +37,8 @@
 #ifndef BOOST_DEFLATE_DETAIL_ADLER_IPP
 #define BOOST_DEFLATE_DETAIL_ADLER_IPP
 
+#include <boost/deflate/detail/adler.hpp>
+
 namespace boost {
 namespace deflate {
 namespace detail {

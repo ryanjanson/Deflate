@@ -113,7 +113,7 @@ enum class gz_os {
   fat,
   amiga,
   vms,
-  unix,
+  _unix,
   vm_cms,
   atari,
   hpfs,

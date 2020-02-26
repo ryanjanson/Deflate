@@ -11,6 +11,8 @@
 #ifndef BOOST_DEFLATE_DETAIL_CRC_IPP
 #define BOOST_DEFLATE_DETAIL_CRC_IPP
 
+#include <boost/deflate/detail/crc.hpp>
+
 namespace boost {
 namespace deflate {
 namespace detail {
