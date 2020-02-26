@@ -49,7 +49,7 @@ GroupSources(test "/")
 add_definitions(-DBOOST_DEFLATE_HEADER_ONLY=1)
 
 add_executable (deflate-tests
-        ${BOOST_BEAST_FILES}
+        ${BOOST_DEFLATE_FILES}
         ${ZLIB_SOURCES}
         Jamfile
         main.cpp
@@ -57,6 +57,6 @@ add_executable (deflate-tests
         deflate_stream.cpp
         inflate_stream.cpp
         zlib.cpp
-    test_suite.hpp)
+        test_suite.hpp)
 
 add_test(deflate-tests deflate-tests)

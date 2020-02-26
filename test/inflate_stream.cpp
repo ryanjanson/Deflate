@@ -110,12 +110,12 @@ class inflate_stream_test
           ::inflateEnd(&zs);
         }
     } zlib_decompressor{};
-    class BoostCompressor : public IDecompressor {
+    class BoostDecompressor : public IDecompressor {
         z_params zp;
         inflate_stream is;
 
     public:
-      BoostCompressor() = default;
+      BoostDecompressor() = default;
 
         void init(int windowBits) override
         {
@@ -144,7 +144,7 @@ class inflate_stream_test
             return ec;
         }
 
-        ~BoostCompressor() override = default;
+        ~BoostDecompressor() override = default;
     } beast_decompressor{};
 public:
     // Lots of repeats, limited char range
@@ -189,17 +189,26 @@ public:
         string_view const& in,
         int level,                  // 0=none, 1..9, -1=default
         int windowBits,             // 9..15
+        Wrap wrap,                  // stream wrapper
         int memLevel,               // 1..9 (8=default)
         int strategy)               // e.g. Z_DEFAULT_STRATEGY
     {
-        int result;
+        switch (wrap) {
+            case Wrap::none:
+                windowBits *= -1;
+                break;
+            case Wrap::gzip:
+                windowBits += 16;
+            default:
+                ;
+        }
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
-        result = deflateInit2(
+        int result = deflateInit2(
             &zs,
             level,
             Z_DEFLATED,
-            -windowBits,
+            windowBits,
             memLevel,
             strategy);
         if(result != Z_OK)
@@ -382,7 +391,7 @@ public:
                         strategy <= strategy_[1]; ++strategy)
                         f(
                             window,
-                            compress(check, level, window, 4, strategy),
+                            compress(check, level, window, Wrap::none, 4, strategy),
                             check);
                 }
             }
@@ -476,14 +485,15 @@ public:
         }
 
 // ASTUN: Always fails on AppleClang and MSVC; still not sure why
-#if 0
+#if 1
         {
             Matrix m{};
-            auto const check = corpus2(10000);
+            auto const check2 = corpus2(10000);
+            //auto const check2 = std::string{"Text"};
             m.level(6);
             m.window(9);
             m.strategy(Z_DEFAULT_STRATEGY);
-            m(Boost{full, once, Flush::trees}, check);
+            m(Boost{full, once, Flush::trees}, check2);
         }
 #endif
         check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, 8,  3);
@@ -598,6 +608,38 @@ public:
         BOOST_TEST(out == "Hello");
     }
 
+    static void testWrappedStreams() {
+        std::string raw = "This is fake content";
+        auto test = [&](Wrap wrap) {
+
+          std::string in = compress(raw, 8, 10, wrap, 1, Z_DEFAULT_STRATEGY);
+          std::string out;
+          out.resize(raw.size());
+
+          z_params zs = {};
+          inflate_stream is{};
+          is.reset(10, wrap, true);
+          error_code ec;
+
+          zs.next_in = &*in.begin();
+          zs.next_out = &out[0];
+          zs.avail_in = in.size();
+          zs.avail_out = out.size();
+
+          while (zs.avail_in > 0 && !ec) {
+              is.write(zs, Flush::sync, ec);
+              auto n = zs.avail_in;
+              zs.next_in = static_cast<char const *>(zs.next_in) + n;
+              zs.avail_in -= n;
+          }
+
+          BOOST_TEST(out == raw);
+        };
+
+        test(Wrap::zlib);
+        test(Wrap::gzip);
+    }
+
     static
     void testUncompressedFlushTrees(IDecompressor& d)
     {
@@ -624,6 +666,9 @@ public:
         std::cerr <<
             "sizeof(inflate_stream) == " <<
             sizeof(inflate_stream) << std::endl;
+
+        testWrappedStreams();
+        //return;
         testInflate(zlib_decompressor);
         testInflate(beast_decompressor);
         testInflateErrors(zlib_decompressor);

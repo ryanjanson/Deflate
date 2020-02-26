@@ -174,7 +174,7 @@ void
 bitstream::
 read(Unsigned& value, std::size_t n)
 {
-    BOOST_ASSERT(n < sizeof(v_)*8);
+    BOOST_ASSERT(n <= sizeof(v_)*8);
     BOOST_ASSERT(n <= n_);
     value = static_cast<Unsigned>(
         v_ & ((1ULL << n) - 1));

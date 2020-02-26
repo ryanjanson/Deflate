@@ -39,7 +39,10 @@
 #define BOOST_DEFLATE_DETAIL_INFLATE_STREAM_IPP
 
 #include <boost/deflate/detail/inflate_stream.hpp>
-#include <boost/throw_exception.hpp>
+#include <boost/deflate/detail/adler.hpp>
+#include <boost/deflate/detail/byte_swap.hpp>
+#include <boost/deflate/detail/crc.hpp>
+#include <algorithm>
 #include <array>
 
 namespace boost {
@@ -50,25 +53,6 @@ void
 inflate_stream::
 doClear()
 {
-}
-
-void
-inflate_stream::
-doReset(int windowBits)
-{
-    if(windowBits < 8 || windowBits > 15)
-        BOOST_THROW_EXCEPTION(std::domain_error{
-            "windowBits out of range"});
-    w_.reset(windowBits);
-
-    bi_.flush();
-    mode_ = HEAD;
-    last_ = 0;
-    dmax_ = 32768U;
-    lencode_ = codes_;
-    distcode_ = codes_;
-    next_ = codes_;
-    back_ = -1;
 }
 
 void
@@ -111,6 +95,11 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
 
+            if(Wrap(wrap_ % 128) != Wrap::none) {
+                check_ = (Wrap(wrap_ % 128) == Wrap::zlib) ?
+                         adler32(r.out.first, r.out.used(), check_) :
+                         crc32(r.out.first, r.out.used(), check_);
+            }
             if(((! r.in.used() && ! r.out.used()) ||
                     flush == Flush::finish) && ! ec)
                 ec = error::need_buffers;
@@ -127,17 +116,203 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
 
     for(;;)
     {
-        switch(mode_)
-        {
-        case HEAD:
-            mode_ = TYPEDO;
-            break;
+        switch(mode_) {
+        case HEAD: {
+            const auto wrap = Wrap(wrap_ % 128);
+            if (wrap == Wrap::none) {
+                mode_ = TYPEDO;
+                break;
+            }
 
+            if(!bi_.fill(16, r.in.next, r.in.last))
+                return done();
+            std::uint16_t hold;
+            bi_.read(hold, 16);
+
+            if (wrap == Wrap::gzip && hold == 0x8b1fU) {
+                check_ = crc32(nullptr, 0);
+                crc32_integral(hold, check_);
+                mode_ = FLAGS;
+                break;
+            }
+
+            BOOST_ASSERT(wrap == Wrap::zlib);
+
+            if ((((hold & 0xffU) << 8U) + (hold >> 8U)) % 31U)
+                return err(error::incorrect_header_check);
+
+            if ((hold & 0xfU) != 8U)
+                return err(error::unknown_compression_method);
+
+            hold >>= 4;
+            const int head_wbits = (hold & 0xfU) + 8u;
+            if (w_.bits() == 0)
+                w_.reset(head_wbits);
+            if (head_wbits > 15 || head_wbits > w_.bits())
+                return err(error::invalid_window_size);
+
+            dmax_ = 1U << head_wbits;
+            check_ = adler32(nullptr, 0);
+            mode_ = hold & 0x200 ? DICTID : TYPE;
+            break;
+        }
+        case FLAGS: {
+            if(!bi_.fill(16, r.in.next, r.in.last))
+                return done();
+            std::uint16_t hold;
+            bi_.read(hold, 16);
+            meth_ = gz_method(hold);
+            flags_ = gz_flags(hold >> 8);
+            if (meth_ != DEFLATE)
+                return err(error::unknown_compression_method);
+            if (flags_ & RESERVED_FLAGS)
+                return err(error::unknown_header_flags);
+            if (head_)
+                head_->text = (hold >> 8) & 1;
+            if ((flags_ & FHCRC) && (wrap_ & 128))
+                crc32_integral(hold, check_);
+            mode_ = TIME;
+            BOOST_FALLTHROUGH;
+        }
+        case TIME: {
+            if(!bi_.fill(32, r.in.next, r.in.last))
+                return done();
+            std::uint32_t hold;
+            bi_.read(hold, 32);
+            if(head_)
+                head_->time = hold;
+            if((flags_ & FHCRC) && (wrap_ & 128))
+                crc32_integral(hold, check_);
+
+            mode_ = OS;
+            BOOST_FALLTHROUGH;
+        }
+        case OS: {
+            if(!bi_.fill(16, r.in.next, r.in.last))
+                return done();
+            std::uint16_t hold;
+            bi_.read(hold, 16);
+            if(head_) {
+                head_->xflags = hold & 0xff;
+                head_->os = gz_os(hold >> 8);
+            }
+            if((flags_ & FHCRC) && (wrap_ & 128))
+                crc32_integral(hold, check_);
+
+            mode_ = EXLEN;
+            BOOST_FALLTHROUGH;
+        }
+        case EXLEN:
+            if(flags_ & FEXTRA) {
+                if(!bi_.fill(16, r.in.next, r.in.last))
+                    return done();
+                std::uint16_t hold;
+                bi_.read(hold, 16);
+                if (head_)
+                    head_->extra.resize(hold);
+                if ((flags_ & FHCRC) && (wrap_ & 128))
+                    crc32_integral(hold, check_);
+            } else if(head_)
+                head_->extra.clear();
+
+            mode_ = EXTRA;
+            bi_.rewind(r.in.next);
+            length_ = 0;
+            BOOST_FALLTHROUGH;
+        case EXTRA:
+            if(flags_ & FEXTRA) {
+                const auto copy =
+                    (std::min)(r.in.avail(), head_->extra.length() - length_);
+                if(head_ && copy)
+                    std::memcpy(&head_->extra[length_], r.in.next, copy);
+                if(flags_ & FHCRC)
+                    check_ = crc32(r.in.next, copy, check_);
+                r.in.next += copy;
+                length_ += copy;
+                if(length_ != head_->extra.length())
+                    return done();
+            }
+
+            mode_ = NAME;
+            length_ = 0;
+            BOOST_FALLTHROUGH;
+        case NAME:
+            if(flags_ & FNAME) {
+                const auto it = std::find(r.in.next, r.in.last, '\0');
+                const bool reached_null = (it != r.in.last);
+                const auto copy = reached_null ?
+                    std::distance(r.in.next, it) : r.in.avail();
+                if(head_ && copy)
+                    std::memcpy(&head_->name[length_], r.in.next, copy);
+                if(flags_ & FHCRC)
+                    check_ = crc32(r.in.next, copy, check_);
+                r.in.next += copy;
+                length_ += copy;
+                if(!reached_null)
+                    return done();
+                r.in.next += 1; // skip null terminator
+            }
+
+            mode_ = COMMENT;
+            length_ = 0;
+            BOOST_FALLTHROUGH;
+        case COMMENT:
+            if(flags_ & FCOMMENT) {
+                const auto it = std::find(r.in.next, r.in.last, '\0');
+                const bool reached_null = (it != r.in.last);
+                const auto copy = reached_null ?
+                                  std::distance(r.in.next, it) : r.in.avail();
+                if(head_ && copy)
+                    std::memcpy(&head_->comment[length_], r.in.next, copy);
+                if(flags_ & FHCRC)
+                    check_ = crc32(r.in.next, copy, check_);
+                r.in.next += copy;
+                length_ += copy;
+                if(!reached_null)
+                    return done();
+                r.in.next += 1; // skip null terminator
+            }
+
+            mode_ = HCRC;
+            BOOST_FALLTHROUGH;
+        case HCRC:
+            if(flags_ & FHCRC){
+                if(!bi_.fill(16, r.in.next, r.in.last))
+                    return done();
+                std::uint16_t hold;
+                bi_.read(hold, 16);
+                if(wrap_ / 128 && hold != (check_ & 0xffff))
+                    return err(error::header_crc_mismatch);
+            }
+            if(head_) {
+                head_->hcrc = (flags_ & FHCRC);
+                head_->done = true;
+            }
+            check_ = crc32(nullptr, 0);
+            mode_ = TYPE;
+        break;
+        case DICTID: {
+            if(!bi_.fill(32, r.in.next, r.in.last))
+                return done();
+            std::uint32_t hold;
+            bi_.read(hold, 32);
+            check_ = bswap(hold);
+
+            mode_ = DICT;
+            BOOST_FALLTHROUGH;
+        }
+        case DICT:
+            if(!havedict_)
+                return err(error::need_dict);
+            check_ = adler32(nullptr, 0);
+
+            mode_ = TYPE;
+            BOOST_FALLTHROUGH;
         case TYPE:
             if(flush == Flush::block || flush == Flush::trees)
                 return done();
-            // fall through
 
+            BOOST_FALLTHROUGH;
         case TYPEDO:
         {
             if(last_)
@@ -146,7 +321,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 mode_ = CHECK;
                 break;
             }
-            if(! bi_.fill(3, r.in.next, r.in.last))
+            if(!bi_.fill(3, r.in.next, r.in.last))
                 return done();
             std::uint8_t v;
             bi_.read(v, 1);
@@ -180,7 +355,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
         {
             bi_.flush_byte();
             std::uint32_t v;
-            if(! bi_.fill(32, r.in.next, r.in.last))
+            if(!bi_.fill(32, r.in.next, r.in.last))
                 return done();
             bi_.peek(v, 32);
             length_ = v & 0xffff;
@@ -512,9 +687,36 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
         }
 
         case CHECK:
+            if(Wrap(wrap_ % 128) != Wrap::none){
+                if(bi_.fill(32, r.in.next, r.in.last))
+                    return done();
+                std::uint32_t hold;
+                bi_.read(hold, 32);
+
+                if((wrap_ / 128) && r.out.used())
+                    check_ = (Wrap(wrap_ % 128) == Wrap::zlib) ?
+                        adler32(r.out.first, r.out.used(), check_) :
+                        crc32(r.out.first, r.out.used(), check_);
+
+                if((wrap_ / 128) && bswap(hold) != check_)
+                    return err(error::incorrect_data_check);
+            }
+
+            mode_ = LENGTH;
+            BOOST_FALLTHROUGH;
+        case LENGTH:
+            if(wrap_ / 128 && Wrap(wrap_ % 128) == Wrap::gzip) {
+                if(bi_.fill(32, r.in.next, r.in.last))
+                    return done();
+                std::uint32_t hold;
+                bi_.read(hold, 32);
+                auto total_out = zs.total_out + r.out.used();
+                if(hold != (total_out & 0xffffffffUL))
+                    return err(error::incorrect_length_check);
+            }
+
             mode_ = DONE;
             BOOST_FALLTHROUGH;
-
         case DONE:
             ec = error::end_of_stream;
             return done();
@@ -528,6 +730,29 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 "stream error"});
         }
     }
+}
+
+void
+inflate_stream::
+doReset(int windowBits, Wrap wrap, bool check)
+{
+    if((windowBits == 0 && wrap == Wrap::zlib)
+       || (windowBits < 8 || windowBits > 15))
+        BOOST_THROW_EXCEPTION(std::domain_error{
+          "windowBits out of range"});
+    w_.reset(windowBits);
+
+    bi_.flush();
+    mode_ = HEAD;
+    last_ = 0;
+    wrap_ =  static_cast<unsigned char>(wrap) + (check ? 128 : 0);
+    havedict_ = false;
+    dmax_ = 32768U;
+    head_ = nullptr;
+    lencode_ = codes_;
+    distcode_ = codes_;
+    next_ = codes_;
+    back_ = -1;
 }
 
 //------------------------------------------------------------------------------

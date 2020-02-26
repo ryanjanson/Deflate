@@ -74,6 +74,12 @@ public:
         case error::invalid_literal_length: return "invalid literal/length code";
         case error::invalid_distance_code: return "invalid distance code";
         case error::invalid_distance: return "invalid distance";
+        case error::incorrect_header_check: return "incorrect header check";
+        case error::incorrect_data_check: return "incorrect data check";
+        case error::incorrect_length_check: return "incorrect length check";
+        case error::unknown_compression_method: return "unknown compression method";
+        case error::invalid_window_size: return "invalid window size";
+        case error::header_crc_mismatch: return "header CRC mismatch";
 
         case error::over_subscribed_length: return "over-subscribed length";
         case error::incomplete_length_set: return "incomplete length set";

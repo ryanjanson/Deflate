@@ -70,14 +70,15 @@ public:
     /** Construct a raw deflate decompression stream.
 
         The window size is set to the default of 15 bits.
+        The stream wrapping is set to the default of Wrap::none
     */
     inflate_stream() = default;
 
     /** Reset the stream.
 
         This puts the stream in a newly constructed state with
-        the previously specified window size, but without de-allocating
-        any dynamically created structures.
+        the previously specified window size and wrapping format, but without
+        de-allocating any dynamically created structures.
     */
     void
     reset()
@@ -88,13 +89,15 @@ public:
     /** Reset the stream.
 
         This puts the stream in a newly constructed state with the
-        specified window size, but without de-allocating any dynamically
-        created structures.
+        specified window size, wrapping format, and checksum validation but,
+        without de-allocating any dynamically created structures.
     */
     void
-    reset(int windowBits)
+    reset(int  windowBits,
+          Wrap format = Wrap::none,
+          bool validate_checksum = true)
     {
-        doReset(windowBits);
+        doReset(windowBits, format, validate_checksum);
     }
 
     /** Put the stream in a newly constructed state.

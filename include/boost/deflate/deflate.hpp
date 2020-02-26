@@ -65,9 +65,8 @@ enum kind
     compress or decompress operation.
 
     The application must update next_in and avail_in when avail_in has dropped
-    to zero.  It must update next_out and avail_out when avail_out has dropped
-    to zero.  The application must initialize zalloc, zfree and opaque before
-    calling the init function.  All other fields are set by the compression
+    to zero. It must update next_out and avail_out when avail_out has dropped
+    to zero. All other fields are set by the compression
     library and must not be updated by the application.
 
     The fields total_in and total_out can be used for statistics or progress
@@ -108,6 +107,54 @@ struct z_params
     int data_type = unknown;  // best guess about the data type: binary or text
 };
 
+/** gzip header OS field values
+ */
+enum class gz_os {
+  fat,
+  amiga,
+  vms,
+  unix,
+  vm_cms,
+  atari,
+  hpfs,
+  macintosh,
+  z_system,
+  cp_m,
+  tops_20,
+  ntfs,
+  qdos,
+  riscos,
+  unknown = 255
+};
+
+/** gzip header contents
+ *
+ * Objects of this type are filled in by callers and provided to the gzip
+ * deflate stream, or default initialized and provided to the gzip inflate stream
+ *
+ * */
+struct gz_header {
+  bool        text;         // true if compressed data believed to be text
+  unsigned    time;         // modification time
+  int         xflags;       // extra flags (not used when writing a gzip file)
+  gz_os       os;           // operating system
+  std::string extra;        // extra field
+  std::string name;         // file name
+  std::string comment;      // comment
+  bool        hcrc;         // true if there was or will be a header crc
+  bool        done = false; // true when done reading gzip header (not used when
+                            //   writing a gzip file)
+};
+
+/** Stream wrapping format option
+ */
+enum class Wrap : unsigned char
+{
+  none = 0,
+  zlib = 1,
+  gzip = 2,
+};
+
 /** Flush option.
 */
 enum class Flush
@@ -126,10 +173,10 @@ enum class Flush
 /* compression levels */
 enum compression
 {
-    none        =  0,
-    best_speed            =  1,
-    best_size      =  9,
-    default_size   = -1
+    none         =  0,
+    best_speed   =  1,
+    best_size    =  9,
+    default_size = -1
 };
 
 /** Compression strategy.

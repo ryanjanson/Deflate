@@ -62,7 +62,7 @@ protected:
 
     BOOST_DEFLATE_DECL
     void
-    doReset(int windowBits);
+    doReset(int windowBits, Wrap wrap, bool check);
 
     BOOST_DEFLATE_DECL
     void
@@ -71,7 +71,7 @@ protected:
     void
     doReset()
     {
-        doReset(w_.bits());
+        doReset(w_.bits(), Wrap::none, true);
     }
 
 private:
@@ -86,6 +86,8 @@ private:
         NAME,       // i: waiting for end of file name (gzip)
         COMMENT,    // i: waiting for end of comment (gzip)
         HCRC,       // i: waiting for header crc (gzip)
+        DICTID,     // i: waiting for dictionary check value
+        DICT,       // waiting for dictionary to be set
         TYPE,       // i: waiting for type bits, including last-flag bit
         TYPEDO,     // i: same, but skip check to exit inflate on new block
         STORED,     // i: waiting for stored size (length and complement)
@@ -150,9 +152,9 @@ private:
         root table size is changed, then these maximum sizes would be need
         to be recalculated and updated.
     */
-    static std::uint16_t constexpr kEnoughLens = 852;
-    static std::uint16_t constexpr kEnoughDists = 592;
-    static std::uint16_t constexpr kEnough = kEnoughLens + kEnoughDists;
+    constexpr static std::uint16_t  kEnoughLens = 852;
+    constexpr static std::uint16_t  kEnoughDists = 592;
+    constexpr static std::uint16_t kEnough = kEnoughLens + kEnoughDists;
 
     struct codes
     {
@@ -168,6 +170,21 @@ private:
         codes,
         lens,
         dists
+    };
+
+    // gzip header flags
+    enum gz_flags : unsigned char {
+        FTEXT    = 1u << 0,
+        FHCRC    = 1u << 1,
+        FEXTRA   = 1u << 2,
+        FNAME    = 1u << 3,
+        FCOMMENT = 1u << 4,
+        RESERVED_FLAGS  = 0xe0,
+    };
+    // gzip compression method
+    enum gz_method : unsigned char {
+      DEFLATE  = 8,
+      RESERVED_METHODS = 0x7,
     };
 
     BOOST_DEFLATE_DECL
@@ -199,7 +216,14 @@ private:
 
     Mode mode_ = HEAD;              // current inflate mode
     int last_ = 0;                  // true if processing last block
+    unsigned char wrap_;            // Wrapping around the stream
+                                    // +128 if we should verify checksum
+    bool havedict_ = false;          //
+    gz_flags flags_;                // gzip header flags (0 if not gzip)
+    gz_method meth_;                // gzip compression method
     unsigned dmax_ = 32768U;        // zlib header max distance (INFLATE_STRICT)
+    std::uint32_t check_;           // data checksum
+    gz_header* head_ = nullptr;
 
     // sliding window
     window w_;
