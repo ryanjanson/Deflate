@@ -235,13 +235,13 @@ public:
     }
 
     static
-    std::string decompress(string_view const& in)
+    std::string decompress(string_view const& in, Wrap wrap = Wrap::none)
     {
         int result;
         std::string out;
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
-        result = inflateInit2(&zs, -15);
+        result = inflateInit2(&zs, wrap == Wrap::none ? -15 : 15);
         if(result != Z_OK)
             throw std::logic_error{"inflateInit2 failed"};
         try
@@ -592,6 +592,29 @@ public:
         }
     }
 
+    static void testWrappedStream(){
+        std::string raw = "This is fake content";
+        auto test = [&](Wrap wrap){
+            std::string compr;
+            compr.resize(raw.size());
+            auto ds = deflate_stream();
+            ds.reset(6, 15, 8, Strategy::normal, wrap);
+            z_params zp{};
+            zp.next_in = raw.c_str();
+            zp.avail_in = raw.size();
+            zp.next_out = &compr[0];
+            zp.avail_out = compr.size();
+
+            error_code ec;
+            ds.write(zp, Flush::full, ec);
+            BOOST_TEST(!ec);
+            BOOST_TEST(decompress(compr) == raw);
+        };
+        test(Wrap::none);
+        test(Wrap::zlib);
+        test(Wrap::gzip);
+    }
+
     void
     run()
     {
@@ -599,6 +622,7 @@ public:
             "sizeof(deflate_stream) == " <<
             sizeof(deflate_stream) << std::endl;
 
+        testWrappedStream();
         testDeflate(zlib_compressor);
         testDeflate(beast_compressor);
         testInvalidSettings(zlib_compressor);

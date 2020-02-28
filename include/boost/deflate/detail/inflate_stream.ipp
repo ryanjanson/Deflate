@@ -38,6 +38,7 @@
 #ifndef BOOST_DEFLATE_DETAIL_INFLATE_STREAM_IPP
 #define BOOST_DEFLATE_DETAIL_INFLATE_STREAM_IPP
 
+#include <boost/deflate/detail/header_constants.hpp>
 #include <boost/deflate/detail/inflate_stream.hpp>
 #include <boost/deflate/detail/adler.hpp>
 #include <boost/deflate/detail/byte_swap.hpp>
@@ -302,6 +303,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             BOOST_FALLTHROUGH;
         }
         case DICT:
+            //FIXME: provide dict checksum
             if(!havedict_)
                 return err(error::need_dict);
             check_ = adler32(nullptr, 0);

@@ -73,13 +73,15 @@ public:
 
         @li `strategy = Strategy::normal`
 
+        @li `wrap = Wrap::none`
+
         Although the stream is ready to be used immediately
         after construction, any required internal buffers are
         not dynamically allocated until needed.
     */
     deflate_stream()
     {
-        reset(6, 15, DEF_MEM_LEVEL, Strategy::normal);
+        reset(6, 15, DEF_MEM_LEVEL, Strategy::normal, Wrap::none);
     }
 
     /** Reset the stream and compression settings.
@@ -99,9 +101,10 @@ public:
         int level,
         int windowBits,
         int memLevel,
-        Strategy strategy)
+        Strategy strategy,
+        Wrap format = Wrap::none)
     {
-        doReset(level, windowBits, memLevel, strategy);
+        doReset(level, windowBits, memLevel, strategy, format);
     }
 
     /** Reset the stream without deallocating memory.

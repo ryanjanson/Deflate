@@ -40,6 +40,7 @@
 
 #include <boost/deflate/error.hpp>
 #include <boost/deflate/deflate.hpp>
+#include <boost/deflate/detail/header_constants.hpp>
 #include <boost/deflate/detail/ranges.hpp>
 #include <boost/assert.hpp>
 #include <boost/config.hpp>
@@ -81,7 +82,7 @@ protected:
     static std::uint16_t constexpr distCodeLen = 512;
 
     // Size limit on bit length codes
-    static std::uint8_t constexpr maxBlBits= 7;
+    static std::uint8_t constexpr maxBlBits = 7;
 
     static std::uint16_t constexpr minMatch = 3;
     static std::uint16_t constexpr maxMatch = 258;
@@ -226,9 +227,10 @@ protected:
         finish_done     /* finish done, accept no more input or output */
     };
 
-    // VFALCO This might not be needed, e.g. for zip/gzip
     enum StreamStatus
     {
+        HEAD_STATE = 42,
+        GZIP_STATE = 57,
         EXTRA_STATE = 69,
         NAME_STATE = 73,
         COMMENT_STATE = 91,
@@ -259,6 +261,9 @@ protected:
         pending_buf_size_;          // size of pending_buf
     Byte* pending_out_;             // next pending byte to output to the stream
     uInt pending_;                  // nb of bytes in the pending buffer
+    Wrap wrap_;                     // stream wrapper
+    gz_header* gzhead_;             // pointer to gzip header
+    std::uint32_t gzindex_;         // where in extra, name, or comment (gzip)
     boost::optional<Flush>
         last_flush_;                // value of flush param for previous deflate call
 
@@ -450,6 +455,27 @@ protected:
         put_byte(w >> 8);
     }
 
+    void
+    put_short_msb(std::uint16_t w)
+    {
+        put_byte(w >> 8);
+        put_byte(w & 0xff);
+    }
+
+    void
+    put_long(std::uint32_t w)
+    {
+        put_short(w & 0xff);
+        put_short(w >> 16);
+    }
+
+    void
+    put_long_msb(std::uint32_t w)
+    {
+        put_short_msb(w >> 16);
+        put_short_msb(w & 0xff);
+    }
+
     /*  Send a value on a given number of bits.
         IN assertion: length <= 16 and value fits in length bits.
     */
@@ -615,7 +641,7 @@ protected:
     lut_type const&
     get_lut();
 
-    BOOST_DEFLATE_DECL void doReset             (int level, int windowBits, int memLevel, Strategy strategy);
+    BOOST_DEFLATE_DECL void doReset             (int level, int windowBits, int memLevel, Strategy strategy, Wrap wrap);
     BOOST_DEFLATE_DECL void doReset             ();
     BOOST_DEFLATE_DECL void doClear             ();
     BOOST_DEFLATE_DECL std::size_t doUpperBound (std::size_t sourceLen) const;

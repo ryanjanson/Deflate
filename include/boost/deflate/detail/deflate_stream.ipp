@@ -51,6 +51,8 @@
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
+#include <boost/deflate/detail/adler.hpp>
+#include <boost/deflate/detail/crc.hpp>
 
 namespace boost {
 namespace deflate {
@@ -230,7 +232,8 @@ doReset(
     int level,
     int windowBits,
     int memLevel,
-    Strategy strategy)
+    Strategy strategy,
+    Wrap wrap)
 {
     if(level == default_size)
         level = 6;
@@ -260,6 +263,7 @@ doReset(
 
     level_ = level;
     strategy_ = strategy;
+    wrap_ = wrap;
     inited_ = false;
 }
 
@@ -357,6 +361,13 @@ void
 deflate_stream::
 doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
 {
+///NONE
+    auto hcrc_update = [&](unsigned long beg) {
+      if (gzhead_->hcrc && pending_ > beg)
+            zs.check = crc32(pending_buf_ + beg,pending_ - beg, zs.check);
+    };
+///~NONE
+
     maybe_init();
 
     if(zs.next_in == nullptr && zs.avail_in != 0)
@@ -415,6 +426,180 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
         ec = error::need_buffers;
         return;
     }
+
+///ZLIB|DYN
+    // Write the header
+    if(status_ == HEAD_STATE) {
+        // zlib header
+        std::uint16_t header = (ZMTH_DEFLATED | (w_bits_ - 8)
+                                << ZCINFO_MASK_TZ) << 8;
+        std::uint16_t lvl_flags = 3;
+        if(strategy_ >= Strategy::huffman || level_ < 2)
+            lvl_flags = 0;
+        else if (level_ < 6)
+            lvl_flags = 1;
+        else if (level_ == 6)
+            lvl_flags = 2;
+
+        header |= lvl_flags << ZFLG_LEVEL_MASK_TZ;
+        if(strstart_ != 0)
+            header |= ZFLG_DICT;
+        header += ZFLG_CHECK_FACTOR - (header % ZFLG_CHECK_FACTOR);
+
+        put_short_msb(header);
+
+        // Save the adler32 of the preset dictionary
+        if(strstart_ != 0){
+            put_short_msb(zs.check >> 16);
+            put_short_msb(zs.check & 0xffff);
+        }
+        zs.check = adler32(nullptr, 0);
+        status_ = BUSY_STATE;
+
+        // Compression must start with an empty pending buffer
+        flush_pending(zs);
+        if(pending_ != 0) {
+            last_flush_ = boost::none;
+            return;
+        }
+    }
+///~ZLIB|DYN
+///GZIP|DYN
+    if(status_ == GZIP_STATE) {
+        // gzip
+        zs.check = crc32(nullptr, 0);
+        //FIXME no magic number
+        put_byte(31);
+        put_byte(139);
+        put_byte(8);
+        if(gzhead_){
+            put_byte(0);
+            put_byte(0);
+            put_byte(0);
+            put_byte(0);
+            put_byte(0);
+            put_byte(level_ == 9 ? 2
+                     : (strategy_ >= Strategy::huffman || level_ < 2) ? 4 : 0);
+            //FIXME add proper OS code
+            put_byte(3); //Unix
+            status_ = BUSY_STATE;
+
+            flush_pending(zs);
+            if(pending_ != 0) {
+                last_flush_ = boost::none;
+                return;
+            }
+        } else {
+            put_byte((gzhead_->text          ? FTEXT  : 0) +
+                     (gzhead_->hcrc             ? FHCRC  : 0) +
+                     (!gzhead_->extra.empty()   ? FEXTRA : 0) +
+                     (!gzhead_->name.empty()    ? FNAME  : 0) +
+                     (!gzhead_->comment.empty() ? FTEXT  : 0));
+            put_long(gzhead_->time);
+            put_byte(level_ == 9 ? 2
+                     : (strategy_ >= Strategy::huffman || level_ < 2) ? 4 : 0);
+            put_byte(static_cast<std::uint8_t>(gzhead_->os));
+
+            put_short(gzhead_->extra.size());
+            if(gzhead_->hcrc)
+                zs.check = crc32(pending_buf_, pending_, zs.check);
+            gzindex_ = 0;
+            status_ = EXTRA_STATE;
+        }
+    }
+    if(status_ == EXTRA_STATE) {
+        if(!gzhead_->extra.empty()) {
+            auto beg = pending_;
+            auto left = (gzhead_->extra.length() & 0xffff) - gzindex_;
+            while (pending_ + left > pending_buf_size_) {
+                auto copy = pending_buf_size_ - pending_;
+                std::memcpy(pending_buf_ + pending_,
+                    gzhead_->extra.c_str() + gzindex_, copy);
+                pending_ = pending_buf_size_;
+                hcrc_update(beg);
+                gzindex_ += copy;
+                flush_pending(zs);
+                if(pending_ != 0) {
+                    last_flush_ = boost::none;
+                    return;
+                }
+                beg = 0;
+                left -= copy;
+            }
+            std::memcpy(pending_buf_ + pending_,
+                gzhead_->extra.c_str() + gzindex_, left);
+            pending_ += left;
+            hcrc_update(beg);
+            gzindex_ = 0;
+        }
+        status_ = NAME_STATE;
+    }
+    if(status_ == NAME_STATE) {
+        if(!gzhead_->name.empty()) {
+            auto beg = pending_;
+            char c;
+            do {
+                if (pending_ == pending_buf_size_) {
+                    hcrc_update(beg);
+                    flush_pending(zs);
+                    if (pending_ != 0) {
+                        last_flush_ = boost::none;
+                        return;
+                    }
+                    beg = 0;
+                }
+                c = gzhead_->name[gzindex_++];
+                put_byte(c);
+            } while (c != '\0');
+            hcrc_update(beg);
+            gzindex_ = 0;
+        }
+        status_ = COMMENT_STATE;
+    }
+    if(status_ == COMMENT_STATE) {
+        if(!gzhead_->comment.empty()) {
+            auto beg = pending_;
+            char c;
+            do {
+                if (pending_ == pending_buf_size_) {
+                    hcrc_update(beg);
+                    flush_pending(zs);
+                    if (pending_ != 0) {
+                        last_flush_ = boost::none;
+                        return;
+                    }
+                    beg = 0;
+                }
+                c = gzhead_->comment[gzindex_++];
+                put_byte(c);
+            } while (c != '\0');
+            hcrc_update(beg);
+            gzindex_ = 0;
+        }
+        status_ = HCRC_STATE;
+    }
+    if(status_ == HCRC_STATE){
+        if(gzhead_->hcrc) {
+            if(pending_ + 2 > pending_buf_size_){
+                flush_pending(zs);
+                if(pending_ != 0) {;
+                    last_flush_ = boost::none;
+                    return;
+                }
+            }
+            put_short(zs.check);
+            zs.check = crc32(nullptr, 0);
+        }
+        status_ = BUSY_STATE;
+
+        // Compression must start with an empty pending buffer
+        flush_pending(zs);
+        if(pending_ != 0) {
+            last_flush_ = boost::none;
+            return;
+        }
+    }
+///~GZIP|DYN
 
     /* Start a new block or continue the current one.
      */
@@ -490,11 +675,40 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
         }
     }
 
-    if(flush == Flush::finish)
-    {
+    if(flush != Flush::finish)
+        return;
+
+///DYN
+    if(wrap_ == Wrap::none) {
+///~DYN
+///DYN|NONE
         ec = error::end_of_stream;
         return;
+///~DYN|NONE
+///DYN
     }
+///~DYN
+
+    // Write the trailer
+///GZIP|DYN
+    if(wrap_ == Wrap::gzip) {
+        put_long(zs.check);
+        put_long(zs.total_in);
+    }
+///~GZIP|DYN
+///DYN
+    else
+///~DYN
+///ZLIB|DYN
+        put_long_msb(zs.check);
+///~ZLIB|DYN
+///!NONE
+    flush_pending(zs);
+    // If avail_out is zero, the application will call deflate again
+    // to flush the rest
+    if(pending_ == 0) // write the trailer only once!
+        ec = error::end_of_stream;
+///~!NONE
 }
 
 // VFALCO Warning: untested
@@ -1673,6 +1887,21 @@ read_buf(z_params& zs, Byte *buf, unsigned size)
     zs.avail_in  -= len;
 
     std::memcpy(buf, zs.next_in, len);
+///DYN
+    if(wrap_ == Wrap::zlib){;
+///~DYN
+///ZLIB|DYN
+        zs.check = adler32(buf, len, zs.check);
+///~ZLIB|DYN
+///DYN
+    } else if(wrap_ == Wrap::gzip) {
+///~DYN
+///GZIP|DYN
+        zs.check = crc32(buf, len, zs.check);
+///~GZIP|DYN
+///DYN
+    }
+///~DYN
     zs.next_in = static_cast<
         std::uint8_t const*>(zs.next_in) + len;
     zs.total_in += len;

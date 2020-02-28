@@ -41,6 +41,7 @@
 #include <boost/deflate/error.hpp>
 #include <boost/deflate/deflate.hpp>
 #include <boost/deflate/detail/bitstream.hpp>
+#include <boost/deflate/detail/header_constants.hpp>
 #include <boost/deflate/detail/ranges.hpp>
 #include <boost/deflate/detail/window.hpp>
 
@@ -172,20 +173,6 @@ private:
         dists
     };
 
-    // gzip header flags
-    enum gz_flags : unsigned char {
-        FTEXT    = 1u << 0,
-        FHCRC    = 1u << 1,
-        FEXTRA   = 1u << 2,
-        FNAME    = 1u << 3,
-        FCOMMENT = 1u << 4,
-        RESERVED_FLAGS  = 0xe0,
-    };
-    // gzip compression method
-    enum gz_method : unsigned char {
-      DEFLATE  = 8,
-      RESERVED_METHODS = 0x7,
-    };
 
     BOOST_DEFLATE_DECL
     static

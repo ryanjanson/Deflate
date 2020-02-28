@@ -105,6 +105,11 @@ struct z_params
     std::size_t total_out = 0;
 
     int data_type = unknown;  // best guess about the data type: binary or text
+
+    /** Adler32 or CRC-32 value of the uncompressed data
+     * FIXME: add dict meaning
+     */
+    std::uint32_t check;
 };
 
 /** gzip header OS field values
