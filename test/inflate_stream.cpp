@@ -667,8 +667,6 @@ public:
             "sizeof(inflate_stream) == " <<
             sizeof(inflate_stream) << std::endl;
 
-        testWrappedStreams();
-        //return;
         testInflate(zlib_decompressor);
         testInflate(beast_decompressor);
         testInflateErrors(zlib_decompressor);
@@ -679,6 +677,7 @@ public:
         testFixedHuffmanFlushTrees(beast_decompressor);
         testUncompressedFlushTrees(zlib_decompressor);
         testUncompressedFlushTrees(beast_decompressor);
+        testWrappedStreams();
     }
 };
 
