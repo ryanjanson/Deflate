@@ -178,7 +178,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             if(!bi_.fill(32, r.in.next, r.in.last))
                 return done();
             std::uint32_t hold;
-            bi_.read(hold, 32);
+            bi_.read_all(hold);
             if(head_)
                 head_->time = hold;
             if((flags_ & FHCRC) && (wrap_ & 128))
@@ -295,7 +295,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             if(!bi_.fill(32, r.in.next, r.in.last))
                 return done();
             std::uint32_t hold;
-            bi_.read(hold, 32);
+            bi_.read_all(hold);
             check_ = bswap(hold);
 
             mode_ = DICT;
@@ -691,7 +691,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 if(bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
-                bi_.read(hold, 32);
+                bi_.read_all(hold);
 
                 if((wrap_ / 128) && r.out.used())
                     check_ = (Wrap(wrap_ % 128) == Wrap::zlib) ?
@@ -709,7 +709,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 if(bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
-                bi_.read(hold, 32);
+                bi_.read_all(hold);
                 auto total_out = zs.total_out + r.out.used();
                 if(hold != (total_out & 0xffffffffUL))
                     return err(error::incorrect_length_check);

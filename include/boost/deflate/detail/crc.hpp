@@ -13,6 +13,7 @@
 #define BOOST_DEFLATE_DETAIL_CRC_HPP
 
 #include <boost/deflate/config.hpp>
+#include <array>
 #include <cstdint>
 
 namespace boost {

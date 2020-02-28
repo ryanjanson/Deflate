@@ -117,6 +117,9 @@ public:
     void
     read(Unsigned& value, std::size_t n);
 
+
+    inline void read_all(value_type& value) noexcept;
+
     // rewind by the number of whole bytes stored (unchecked)
     template<class BidirIt>
     void
@@ -174,12 +177,22 @@ void
 bitstream::
 read(Unsigned& value, std::size_t n)
 {
-    BOOST_ASSERT(n <= sizeof(v_)*8);
+    BOOST_ASSERT(n < sizeof(v_)*8);
     BOOST_ASSERT(n <= n_);
     value = static_cast<Unsigned>(
         v_ & ((1ULL << n) - 1));
     v_ >>= n;
     n_ -= static_cast<unsigned>(n);
+}
+
+inline
+void
+bitstream::
+read_all(value_type& value) noexcept
+{
+    BOOST_ASSERT(n_ == sizeof(v_)*8);
+    value = v_;
+    v_ = n_ = 0;
 }
 
 template<class BidirIt>
