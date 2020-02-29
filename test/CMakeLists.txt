@@ -15,7 +15,7 @@ GroupSources (test/extern/zlib-1.2.11 zlib)
 GroupSources (test/beast/zlib "/")
 
 set (ZLIB_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/extern/zlib-1.2.11/crc32.h
+        ${CMAKE_CURRENT_LIST_DIR}/extern/zlib-1.2.11/adler32.h
         ${CMAKE_CURRENT_LIST_DIR}/extern/zlib-1.2.11/deflate.h
         ${CMAKE_CURRENT_LIST_DIR}/extern/zlib-1.2.11/inffast.h
         ${CMAKE_CURRENT_LIST_DIR}/extern/zlib-1.2.11/inffixed.h
@@ -53,6 +53,8 @@ add_executable (deflate-tests
         ${ZLIB_SOURCES}
         Jamfile
         main.cpp
+        adler32.cpp
+        crc32.cpp
         error.cpp
         deflate_stream.cpp
         inflate_stream.cpp
