@@ -27,7 +27,7 @@ class inflate_stream_test
 {
     struct IDecompressor {
         virtual void init() = 0;
-        virtual void init(int windowBits) = 0;
+        virtual void init(int windowBits, Wrap wrap = Wrap::none) = 0;
 
         virtual std::size_t avail_in() const noexcept = 0;
         virtual void avail_in(std::size_t) noexcept = 0;
@@ -46,8 +46,12 @@ class inflate_stream_test
 
     public:
         ZlibDecompressor() = default;
-        void init(int windowBits) override
+        void init(int windowBits, Wrap wrap) override
         {
+            if(wrap == Wrap::none)
+                windowBits *= -1;
+            else if(wrap == Wrap::gzip)
+                windowBits += 16;
             inflateEnd(&zs);
             zs = {};
             const auto res = inflateInit2(&zs, windowBits);
@@ -95,6 +99,41 @@ class inflate_stream_test
             case Z_NEED_DICT:
               return error::need_dict;
             case Z_DATA_ERROR:
+                if(zs.msg && !std::strcmp(zs.msg, "invalid stored block lengths"))
+                    return error::invalid_stored_length;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid block type"))
+                    return error::invalid_block_type;
+                if(zs.msg && !std::strcmp(zs.msg, "too many length or distance symbols"))
+                    return error::too_many_symbols;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid code lengths set"))
+                    return error::incomplete_length_set;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid literal/lengths set"))
+                    return error::over_subscribed_length;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid literal/length code"))
+                    return error::invalid_literal_length;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid distance code"))
+                    return error::invalid_distance_code;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid distance too far back"))
+                    return error::invalid_distance;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid bit length repeat"))
+                    return error::invalid_bit_length_repeat;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid code -- missing end-of-block"))
+                    return error::missing_eob;
+                if(zs.msg && !std::strcmp(zs.msg, "unknown compression method"))
+                    return error::unknown_compression_method;
+                if(zs.msg && !std::strcmp(zs.msg, "invalid window size"))
+                        return error::invalid_window_size;
+                if(zs.msg && !std::strcmp(zs.msg, "incorrect header check"))
+                        return error::incorrect_header_check;
+                if(zs.msg && !std::strcmp(zs.msg, "incorrect data check"))
+                    return error::incorrect_data_check;
+                if(zs.msg && !std::strcmp(zs.msg, "incorrect length check"))
+                    return error::incorrect_length_check;
+                if(zs.msg && !std::strcmp(zs.msg, "header crc mismatch"))
+                    return error::header_crc_mismatch;
+                if(zs.msg && !std::strcmp(zs.msg, "unknown header flags set"))
+                    return error::unknown_header_flags;
+                BOOST_FALLTHROUGH;
             case Z_STREAM_ERROR:
               return error::stream_error;
             case Z_MEM_ERROR:
@@ -117,11 +156,11 @@ class inflate_stream_test
     public:
       BoostDecompressor() = default;
 
-        void init(int windowBits) override
+        void init(int windowBits, Wrap wrap) override
         {
             zp = {};
             is.clear();
-            is.reset(windowBits);
+            is.reset(windowBits, wrap);
         }
         void init() override {
           zp = {};
@@ -496,7 +535,7 @@ public:
             m(Boost{full, once, Flush::trees}, check2);
         }
 #endif
-        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, 8,  3);
+        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, Wrap::none, 8,  3);
         check(d, {0xed, 0xc0, 0x81, 0x00, 0x00, 0x00, 0x00, 0x80,
                0xa0, 0xfd, 0xa9, 0x17, 0xa9, 0x00, 0x00, 0x00,
                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -509,26 +548,25 @@ public:
     std::string check(IDecompressor& d,
         std::initializer_list<std::uint8_t> const& in,
         error_code expected,
+        Wrap wrap = Wrap::none,
         std::size_t window_size = 15,
         std::size_t len = -1)
     {
         std::string out(1024, 0);
-        z_params zs;
-        inflate_stream is;
-        is.reset(static_cast<int>(window_size));
+        d.init(static_cast<int>(window_size), wrap);
         error_code ec;
 
-        zs.next_in = &*in.begin();
-        zs.next_out = &out[0];
-        zs.avail_in = std::min(in.size(), len);
-        zs.avail_out = out.size();
+        d.next_in(&*in.begin());
+        d.next_out(&out[0]);
+        d.avail_in(std::min(in.size(), len));
+        d.avail_out(out.size());
 
-        while (zs.avail_in > 0 && !ec)
+        while (d.avail_in() > 0 && !ec)
         {
-            is.write(zs, Flush::sync, ec);
-            auto n = std::min(zs.avail_in, len);
-            zs.next_in = static_cast<char const*>(zs.next_in) + n;
-            zs.avail_in -= n;
+            ec = d.write(Flush::sync);
+            auto n = std::min(d.avail_in(), len);
+            d.next_in(static_cast<char const*>(d.next_in()) + n);
+            d.avail_in(d.avail_in() - n);
         }
 
         BOOST_TEST(ec == expected);
@@ -585,6 +623,24 @@ public:
     void testInvalidSettings(IDecompressor& d)
     {
         BOOST_TEST_THROWS(d.init(7), std::domain_error);
+    }
+
+    static
+    void testInvalidHeader(IDecompressor& d)
+    {
+        check(d, {0x14, 0x00}, error::incorrect_header_check, Wrap::zlib);
+        check(d, {0x17, 0x02}, error::unknown_compression_method, Wrap::zlib);
+        check(d, {0xf8, 0x00}, error::invalid_window_size, Wrap::zlib, 10);
+        check(d, {0x1f, 0x8b, 0x07, 0x00}, error::unknown_compression_method, Wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0xe0}, error::unknown_header_flags, Wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x04,
+                  0x03, 0xff, 0xff}, error::header_crc_mismatch, Wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0x00,
+                  0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
+                  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, error::incorrect_data_check, Wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0x00,
+                  0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
+                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, error::incorrect_length_check, Wrap::gzip);
     }
 
     static
@@ -673,6 +729,8 @@ public:
         testInflateErrors(beast_decompressor);
         testInvalidSettings(zlib_decompressor);
         testInvalidSettings(beast_decompressor);
+        testInvalidHeader(zlib_decompressor);
+        testInvalidHeader(beast_decompressor);
         testFixedHuffmanFlushTrees(zlib_decompressor);
         testFixedHuffmanFlushTrees(beast_decompressor);
         testUncompressedFlushTrees(zlib_decompressor);

@@ -690,7 +690,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
 
         case CHECK:
             if(Wrap(wrap_ % 128) != Wrap::none){
-                if(bi_.fill(32, r.in.next, r.in.last))
+                if(!bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
                 bi_.read_all(hold);
@@ -708,7 +708,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             BOOST_FALLTHROUGH;
         case LENGTH:
             if(wrap_ / 128 && Wrap(wrap_ % 128) == Wrap::gzip) {
-                if(bi_.fill(32, r.in.next, r.in.last))
+                if(!bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
                 bi_.read_all(hold);
