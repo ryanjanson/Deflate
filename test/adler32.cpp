@@ -19,12 +19,17 @@ namespace detail {
 
 class adler32_test {
 public:
+  std::uint32_t eq(const char* data, int size = -1, std::uint32_t init = -1) {
+    return adler32(reinterpret_cast<const unsigned char*>(data),
+                   size > 0 ? size : std::strlen(data), init != -1U ? init : adler32(nullptr, 0))
+           == ::adler32(init != -1U ? init : ::adler32(0, nullptr, 0),
+                        reinterpret_cast<const unsigned char*>(data),
+                        size > 0 ? size : std::strlen(data));
+  }
   void run() {
-        const auto eq = [](const char* data) {
-            return adler32(reinterpret_cast<const unsigned char*>(data), std::strlen(data), adler32(nullptr, 0))
-                == ::adler32(::adler32(0, nullptr, 0), reinterpret_cast<const unsigned char*>(data), std::strlen(data));
-        };
+
         BOOST_TEST(eq(""));
+        BOOST_TEST(eq("short"));
         BOOST_TEST(eq("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"));
         BOOST_TEST(eq("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec vitae justo orci." \
                         " Curabitur mattis venenatis tortor, et posuere dolor scelerisque quis. Proin in " \
@@ -37,7 +42,10 @@ public:
                         "mus dictum leo id semper posuere. Curabitur id nibh vel elit efficitur euismod s" \
                         "ed vitae nulla. Proin erat mi, gravida at suscipit non, rhoncus vitae nibh. Maec" \
                         "enas cursus maximus leo eu tristique."));
-
+        const char large[8000] {'\xff'};
+        BOOST_TEST(eq(large, 8000));
+        BOOST_TEST(eq("\x15\xb0"));
+        BOOST_TEST(eq("\x02", 1, 0xfff0));
 
   }
 };
