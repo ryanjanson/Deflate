@@ -307,7 +307,7 @@ public:
         call of @ref write, since the currently available input may have to be
         compressed and flushed. In particular, `zs.avail_out` must be non-zero.
 
-        @return `Z_OK` if success, `Z_STREAM_ERROR` if the source stream state
+        @param ec `Z_OK` if success, `Z_STREAM_ERROR` if the source stream state
         was inconsistent or if a parameter was invalid, `error::need_buffers`
         if `zs.avail_out` was zero.
     */
@@ -351,7 +351,7 @@ public:
         many of the least significant bits of `value` will be inserted in
         the output.
 
-        @return `error::need_buffers` if there was not enough room in
+        @param ec `error::need_buffers` if there was not enough room in
         the internal buffer to insert the bits.
     */
     void
