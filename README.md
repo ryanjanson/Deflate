@@ -13,9 +13,31 @@ Branch          | Travis | Appveyor | Azure Pipelines | codecov.io | Docs | Matr
 
 ## Introduction
 
+This library provides a C++11 (and above) implementation of the Deflate compression format (described in RFC 1951) as
+well as the zlib (RFC1950) and gzip (RFC1952) data formats. Its design is currently based on [zlib](https://zlib.net)
+and is mainly composed of original work by Vinnie Falco based on the zlib library.
+
 ## Motivation
 
+A quick search on compression algorithms reveals a myriad of different specifications and implementations. One of the
+most notable is the Deflate format which is used in a lot of other file formats (PNG, ZIP, PDF, ...) as well as in
+data transfers over HTTP and WebSockets. While the zlib library does a great job of providing a good reference C
+implementation, it lacks a proper modern C++ interface making it harder to use and possibly unsuitable for pure C++ code
+or even other Boost projects, which ["**should not** use libraries other than Boost or the C++ Standard Library"](https://www.boost.org/development/reuse.html).
+This library could thus be used to bridge the gap between common data formats and the Boost environment without having
+each project rolling its own version.  
+
 ## Design Goals
+
+This library is not a [zlib](https://zlib.net) wrapper, however since zlib is industry standard software and has been so
+for now decades, it should be able to accomplish the same tasks with comparable performance and allow zlib users to
+switch to this library without great trouble.
+
+The design of the library also achieves these goals:
+- Requires only C++11 when used with Boost
+- Fast compilation performance
+- Uniform interface across all supported C++ versions
+- Be usable in a standalone mode (without Boost) in C++17 and above
 
 ## License
 
