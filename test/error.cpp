@@ -53,6 +53,13 @@ public:
         check("boost.deflate", error::invalid_distance_code);
         check("boost.deflate", error::invalid_distance);
 
+        check("boost.deflate", error::incorrect_header_check);
+        check("boost.deflate", error::incorrect_data_check);
+        check("boost.deflate", error::incorrect_length_check);
+        check("boost.deflate", error::unknown_compression_method);
+        check("boost.deflate", error::invalid_window_size);
+        check("boost.deflate", error::header_crc_mismatch);
+
         check("boost.deflate", error::over_subscribed_length);
         check("boost.deflate", error::incomplete_length_set);
 
