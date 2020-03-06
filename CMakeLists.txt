@@ -8,146 +8,98 @@
 # Official repository: https://github.com/ryanjanson/deflate
 #
 
-cmake_minimum_required (VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.5...3.16)
 
-if (POLICY CMP0074)
-    cmake_policy (SET CMP0074 NEW)
+set(BOOST_DEFLATE_VERSION 1)
+if(BOOST_SUPERPROJECT_VERSION)
+    set(BOOST_DEFLATE_VERSION ${BOOST_SUPERPROJECT_VERSION})
 endif()
 
-#-------------------------------------------------------------------------------
+project(boost_deflate VERSION ${BOOST_DEFLATE_VERSION} LANGUAGES CXX)
 
-function (DoGroupSources curdir rootdir folder)
-    file (GLOB children RELATIVE ${PROJECT_SOURCE_DIR}/${curdir} ${PROJECT_SOURCE_DIR}/${curdir}/*)
-    foreach (child ${children})
-        if (IS_DIRECTORY ${PROJECT_SOURCE_DIR}/${curdir}/${child})
-            DoGroupSources (${curdir}/${child} ${rootdir} ${folder})
-        elseif (${child} STREQUAL "CMakeLists.txt")
-            source_group("" FILES ${PROJECT_SOURCE_DIR}/${curdir}/${child})
-        else()
-            string (REGEX REPLACE ^${rootdir} ${folder} groupname ${curdir})
-            string (REPLACE "/" "\\" groupname ${groupname})
-            source_group (${groupname} FILES ${PROJECT_SOURCE_DIR}/${curdir}/${child})
-        endif()
-    endforeach()
-endfunction()
-
-function (GroupSources curdir folder)
-    DoGroupSources (${curdir} ${curdir} ${folder})
-endfunction()
-
-#-------------------------------------------------------------------------------
-#
-# Deflate
-#
-#-------------------------------------------------------------------------------
-
-project (Deflate VERSION 1)
-
-set_property (GLOBAL PROPERTY USE_FOLDERS ON)
-
-if (MSVC)
-    set (CMAKE_VERBOSE_MAKEFILE FALSE)
-
-    add_definitions (
-        -D_WIN32_WINNT=0x0601
-        -D_CRT_SECURE_NO_WARNINGS
-    )
-
-    add_compile_options(
-        /permissive-  # strict C++
-        /W4           # enable all warnings
-        /MP           # Multi-processor compilation
+file(GLOB_RECURSE BOOST_DEFLATE_HEADERS CONFIGURE_DEPENDS
+        include/boost/*.hpp
+        include/boost/*.ipp
         )
 
-    add_link_options(
-        /INCREMENTAL:NO
-    )
+set(BOOST_DEFLATE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/src.cpp
+        )
 
-    set (Boost_USE_STATIC_LIBS ON)
-    set (Boost_USE_STATIC_RUNTIME ON)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
-    set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Ob2 /Oi /Ot /GL /MT")
-    set (CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Oi /Ot /MT")
+if(${CMAKE_VERSION} VERSION_GREATER 3.7.2)
+    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/include/boost PREFIX "" FILES ${BOOST_DEFLATE_HEADERS})
+    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "" FILES ${BOOST_DEFLATE_SOURCES})
+endif()
 
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
-    set (CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+add_library(boost_deflate ${BOOST_DEFLATE_HEADERS} ${BOOST_DEFLATE_SOURCES})
+add_library(Boost::deflate ALIAS boost_deflate)
 
-    # for RelWithDebInfo builds, disable incremental linking
-    # since CMake sets it ON by default for that build type and it
-    # causes warnings
-    #
-    string (REPLACE "/INCREMENTAL" "/INCREMENTAL:NO" replacement_flags
-        ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO})
-    set (CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO ${replacement_flags})
+target_compile_features(boost_deflate PUBLIC cxx_constexpr)
 
+target_include_directories(boost_deflate PUBLIC include)
+
+target_compile_definitions(boost_deflate PUBLIC BOOST_DEFLATE_NO_LIB=1)
+
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(boost_deflate PUBLIC BOOST_DEFLATE_DYN_LINK=1)
 else()
-    set (THREADS_PREFER_PTHREAD_FLAG ON)
-    find_package (Threads)
-
-    set( CMAKE_CXX_FLAGS
-      "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -Wpedantic -Wno-unused-parameter")
-
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wrange-loop-analysis")
-    endif ()
+    target_compile_definitions(boost_deflate PUBLIC BOOST_DEFLATE_STATIC_LINK=1)
 endif()
 
-# Must come before Boost includes, otherwise the
-# IDE sees the wrong file due to boost/ symlinks.
-include_directories (include)
+option(BOOST_DEFLATE_STANDALONE "Build boost::deflate as a static standalone library" FALSE)
 
-#-------------------------------------------------------------------------------
-#
-# Boost
-#
-#-------------------------------------------------------------------------------
+if(BOOST_DEFLATE_STANDALONE)
+    target_compile_features(boost_deflate PUBLIC cxx_std_17)
+    target_compile_definitions(boost_deflate PUBLIC BOOST_DEFLATE_STANDALONE)
+    add_subdirectory(example)
+elseif(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    #
+    # Root project such as on Travis or other CI,
+    # or when producing Visual Studio Solution and Projects
+    #
 
-get_filename_component (BOOST_ROOT ../../ ABSOLUTE)
-
-# VFALCO I want static but "b2 stage" builds a minimal set which excludes static
-add_definitions (-DBOOST_ALL_STATIC_LINK=1)
-
-include_directories (${BOOST_ROOT})
-
-link_directories(${BOOST_ROOT}/stage/lib)
-
-#-------------------------------------------------------------------------------
-
-if ("${VARIANT}" STREQUAL "coverage")
-    if (MSVC)
+    if (BOOST_DEFLATE_FIND_BOOST)
+        find_package(Boost REQUIRED COMPONENTS system)
+        target_link_libraries(boost_deflate PUBLIC Boost::system)
     else()
-        set (CMAKE_BUILD_TYPE DEBUG)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2 --coverage")
-        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+        get_filename_component(BOOST_ROOT ../.. ABSOLUTE)
+        target_include_directories(boost_deflate PUBLIC ${BOOST_ROOT})
+        target_link_directories(boost_deflate PUBLIC ${BOOST_ROOT}/stage/lib)
     endif()
 
-elseif ("${VARIANT}" STREQUAL "ubasan")
-    if (MSVC)
-    else()
-        set (CMAKE_BUILD_TYPE RELWITHDEBINFO)
-        set (CMAKE_CXX_FLAGS
-          "${CMAKE_CXX_FLAGS} -msse4.2 -funsigned-char -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=address,undefined -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/tools/blacklist.supp")
-        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined -fno-sanitize-recover=address,undefined")
+    #add_subdirectory(bench)
+    add_subdirectory(example)
+    add_subdirectory(test)
+
+elseif(BOOST_SUPERPROJECT_VERSION)
+    #
+    # Building with Boost superproject cmake
+    #
+    target_link_libraries(boost_deflate
+            PUBLIC
+            Boost::assert
+            Boost::config
+            Boost::core
+            Boost::exception
+            Boost::system
+            Boost::utility
+            )
+else()
+    #
+    # Out-of-tree, non-standalone build
+    #
+    find_package(Boost COMPONENTS system)
+    target_link_libraries(boost_deflate
+            PUBLIC
+            Boost::system
+            )
+    option(BUILD_TESTING "Build the tests" ON)
+    if (BUILD_TESTING)
+        #add_subdirectory(bench)
+        add_subdirectory(example)
+        add_subdirectory(test)
     endif()
-
-elseif ("${VARIANT}" STREQUAL "debug")
-    set (CMAKE_BUILD_TYPE DEBUG)
-
-elseif ("${VARIANT}" STREQUAL "release")
-    set (CMAKE_BUILD_TYPE RELEASE)
 
 endif()
-
-#-------------------------------------------------------------------------------
-#
-# Tests and examples
-#
-
-file (GLOB_RECURSE PROJECT_FILES
-    ${PROJECT_SOURCE_DIR}/include/boost/deflate/*.hpp
-    ${PROJECT_SOURCE_DIR}/include/boost/deflate/*.ipp
-)
-
-add_subdirectory (example)
-add_subdirectory (test)
