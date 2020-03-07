@@ -25,6 +25,7 @@ the program, with the macro BOOST_DEFLATE_SEPARATE_COMPILATION defined.
 
 #include <boost/deflate/detail/adler.ipp>
 #include <boost/deflate/detail/crc.ipp>
+#include <boost/deflate/detail/easy.ipp>
 #include <boost/deflate/detail/deflate_stream.ipp>
 #include <boost/deflate/detail/inflate_stream.ipp>
 #include <boost/deflate/impl/error.ipp>

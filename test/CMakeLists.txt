@@ -23,6 +23,7 @@ add_executable (deflate-tests
         adler32.cpp
         crc32.cpp
         error.cpp
+        easy.cpp
         deflate_stream.cpp
         inflate_stream.cpp
         zlib.cpp

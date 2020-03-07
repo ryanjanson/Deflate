@@ -43,6 +43,7 @@ lib zlib :
 local SOURCES =
     adler32.cpp
     crc32.cpp
+    easy.cpp
     error.cpp
     deflate_stream.cpp
     inflate_stream.cpp
