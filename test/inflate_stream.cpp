@@ -27,7 +27,7 @@ class inflate_stream_test
 {
     struct IDecompressor {
         virtual void init() = 0;
-        virtual void init(int windowBits, wrap wrap = wrap::none) = 0;
+        virtual void init(int windowBits, wrap wrap =boost::deflate::wrap::none) = 0;
 
         virtual std::size_t avail_in() const noexcept = 0;
         virtual void avail_in(std::size_t) noexcept = 0;
@@ -48,9 +48,9 @@ class inflate_stream_test
         ZlibDecompressor() = default;
         void init(int windowBits, wrap wrap) override
         {
-            if(wrap == wrap::none)
+            if(wrap == boost::deflate::wrap::none)
                 windowBits *= -1;
-            else if(wrap == wrap::gzip)
+            else if(wrap == boost::deflate::wrap::gzip)
                 windowBits += 16;
             inflateEnd(&zs);
             zs = {};
@@ -233,10 +233,10 @@ public:
         int strategy)               // e.g. Z_DEFAULT_STRATEGY
     {
         switch (wrap) {
-            case wrap::none:
+            case boost::deflate::wrap::none:
                 windowBits *= -1;
                 break;
-            case wrap::gzip:
+            case boost::deflate::wrap::gzip:
                 windowBits += 16;
             default:
                 ;
@@ -430,7 +430,7 @@ public:
                         strategy <= strategy_[1]; ++strategy)
                         f(
                             window,
-                            compress(check, level, window, wrap::none, 4, strategy),
+                            compress(check, level, window,boost::deflate::wrap::none, 4, strategy),
                             check);
                 }
             }
@@ -535,7 +535,7 @@ public:
             m(Boost{full, once, Flush::trees}, check2);
         }
 #endif
-        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, wrap::none, 8, 3);
+        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {},boost::deflate::wrap::none, 8, 3);
         check(d, {0xed, 0xc0, 0x81, 0x00, 0x00, 0x00, 0x00, 0x80,
                0xa0, 0xfd, 0xa9, 0x17, 0xa9, 0x00, 0x00, 0x00,
                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -548,7 +548,7 @@ public:
     std::string check(IDecompressor& d,
                       std::initializer_list<std::uint8_t> const& in,
                       error_code expected,
-                      wrap wrap = wrap::none,
+                      wrap wrap =boost::deflate::wrap::none,
                       std::size_t window_size = 15,
                       std::size_t len = -1)
     {
@@ -628,19 +628,19 @@ public:
     static
     void testInvalidHeader(IDecompressor& d)
     {
-        check(d, {0x14, 0x00}, error::incorrect_header_check, wrap::zlib);
-        check(d, {0x17, 0x02}, error::unknown_compression_method, wrap::zlib);
-        check(d, {0xf8, 0x00}, error::invalid_window_size, wrap::zlib, 10);
-        check(d, {0x1f, 0x8b, 0x07, 0x00}, error::unknown_compression_method, wrap::gzip);
-        check(d, {0x1f, 0x8b, 0x08, 0xe0}, error::unknown_header_flags, wrap::gzip);
+        check(d, {0x14, 0x00}, error::incorrect_header_check, boost::deflate::wrap::zlib);
+        check(d, {0x17, 0x02}, error::unknown_compression_method, boost::deflate::wrap::zlib);
+        check(d, {0xf8, 0x00}, error::invalid_window_size, boost::deflate::wrap::zlib, 10);
+        check(d, {0x1f, 0x8b, 0x07, 0x00}, error::unknown_compression_method, boost::deflate::wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0xe0}, error::unknown_header_flags, boost::deflate::wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x04,
-                  0x03, 0xff, 0xff}, error::header_crc_mismatch, wrap::gzip);
+                  0x03, 0xff, 0xff}, error::header_crc_mismatch, boost::deflate::wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x00,
                   0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
-                  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, error::incorrect_data_check, wrap::gzip);
+                  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, error::incorrect_data_check, boost::deflate::wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x00,
                   0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
-                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, error::incorrect_length_check, wrap::gzip);
+                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, error::incorrect_length_check, boost::deflate::wrap::gzip);
     }
 
     static
@@ -692,8 +692,8 @@ public:
           BOOST_TEST(out == raw);
         };
 
-        test(wrap::zlib);
-        test(wrap::gzip);
+        test(boost::deflate::wrap::zlib);
+        test(boost::deflate::wrap::gzip);
     }
 
     static

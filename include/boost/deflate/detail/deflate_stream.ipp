@@ -679,7 +679,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
         return;
 
 ///DYN
-    if(wrap_ == wrap::none) {
+    if(wrap_ == boost::deflate::wrap::none) {
 ///~DYN
 ///DYN|NONE
         ec = error::end_of_stream;
@@ -691,7 +691,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
 
     // Write the trailer
 ///GZIP|DYN
-    if(wrap_ == wrap::gzip) {
+    if(wrap_ == boost::deflate::wrap::gzip) {
         put_long(zs.check);
         put_long(zs.total_in);
     }
@@ -1888,13 +1888,13 @@ read_buf(z_params& zs, Byte *buf, unsigned size)
 
     std::memcpy(buf, zs.next_in, len);
 ///DYN
-    if(wrap_ == wrap::zlib){;
+    if(wrap_ == boost::deflate::wrap::zlib){;
 ///~DYN
 ///ZLIB|DYN
         zs.check = adler32(buf, len, zs.check);
 ///~ZLIB|DYN
 ///DYN
-    } else if(wrap_ == wrap::gzip) {
+    } else if(wrap_ == boost::deflate::wrap::gzip) {
 ///~DYN
 ///GZIP|DYN
         zs.check = crc32(buf, len, zs.check);

@@ -70,7 +70,7 @@ public:
     /** Construct a raw deflate decompression stream.
 
         The window size is set to the default of 15 bits.
-        The stream wrapping is set to the default of wrap::none
+        The stream wrapping is set to the default ofboost::deflate::wrap::none
     */
     inflate_stream() = default;
 
@@ -94,7 +94,7 @@ public:
     */
     void
     reset(int  windowBits,
-          wrap format = wrap::none,
+          wrap format =boost::deflate::wrap::none,
           bool validate_checksum = true)
     {
         doReset(windowBits, format, validate_checksum);

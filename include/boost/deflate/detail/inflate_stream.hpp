@@ -72,7 +72,7 @@ protected:
     void
     doReset()
     {
-        doReset(w_.bits(), wrap::none, true);
+        doReset(w_.bits(),boost::deflate::wrap::none, true);
     }
 
 private:

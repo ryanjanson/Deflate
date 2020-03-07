@@ -20,10 +20,10 @@ namespace boost {
 namespace deflate {
 
 BOOST_DEFLATE_DECL
-optional<std::string> easy_compress(string_view in, wrap wrapping = wrap::none);
+optional<std::string> easy_compress(string_view in, wrap wrapping = boost::deflate::wrap::none);
 
 BOOST_DEFLATE_DECL
-optional<std::string> easy_uncompress(string_view in, wrap wrapping = wrap::none);
+optional<std::string> easy_uncompress(string_view in, wrap wrapping = boost::deflate::wrap::none);
 
 }
 }

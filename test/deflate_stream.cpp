@@ -235,13 +235,13 @@ public:
     }
 
     static
-    std::string decompress(string_view const& in, wrap wrap = wrap::none)
+    std::string decompress(string_view const& in, wrap wrap =boost::deflate::wrap::none)
     {
         int result;
         std::string out;
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
-        result = inflateInit2(&zs, wrap == wrap::none ? -15 : 15);
+        result = inflateInit2(&zs, wrap == boost::deflate::wrap::none ? -15 : 15);
         if(result != Z_OK)
             throw std::logic_error{"inflateInit2 failed"};
         try
@@ -610,9 +610,9 @@ public:
             BOOST_TEST(!ec);
             BOOST_TEST(decompress(compr) == raw);
         };
-        test(wrap::none);
-        test(wrap::zlib);
-        test(wrap::gzip);
+        test(boost::deflate::wrap::none);
+        test(boost::deflate::wrap::zlib);
+        test(boost::deflate::wrap::gzip);
     }
 
     void
