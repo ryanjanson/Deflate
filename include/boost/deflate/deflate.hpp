@@ -153,7 +153,7 @@ struct gz_header {
 
 /** Stream wrapping format option
  */
-enum class Wrap : unsigned char
+enum class wrap : unsigned char
 {
   none = 0,
   zlib = 1,

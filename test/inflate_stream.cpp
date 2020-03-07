@@ -27,7 +27,7 @@ class inflate_stream_test
 {
     struct IDecompressor {
         virtual void init() = 0;
-        virtual void init(int windowBits, Wrap wrap = Wrap::none) = 0;
+        virtual void init(int windowBits, wrap wrap = wrap::none) = 0;
 
         virtual std::size_t avail_in() const noexcept = 0;
         virtual void avail_in(std::size_t) noexcept = 0;
@@ -46,11 +46,11 @@ class inflate_stream_test
 
     public:
         ZlibDecompressor() = default;
-        void init(int windowBits, Wrap wrap) override
+        void init(int windowBits, wrap wrap) override
         {
-            if(wrap == Wrap::none)
+            if(wrap == wrap::none)
                 windowBits *= -1;
-            else if(wrap == Wrap::gzip)
+            else if(wrap == wrap::gzip)
                 windowBits += 16;
             inflateEnd(&zs);
             zs = {};
@@ -156,7 +156,7 @@ class inflate_stream_test
     public:
       BoostDecompressor() = default;
 
-        void init(int windowBits, Wrap wrap) override
+        void init(int windowBits, wrap wrap) override
         {
             zp = {};
             is.clear();
@@ -228,15 +228,15 @@ public:
         string_view const& in,
         int level,                  // 0=none, 1..9, -1=default
         int windowBits,             // 9..15
-        Wrap wrap,                  // stream wrapper
+        wrap wrap,                  // stream wrapper
         int memLevel,               // 1..9 (8=default)
         int strategy)               // e.g. Z_DEFAULT_STRATEGY
     {
         switch (wrap) {
-            case Wrap::none:
+            case wrap::none:
                 windowBits *= -1;
                 break;
-            case Wrap::gzip:
+            case wrap::gzip:
                 windowBits += 16;
             default:
                 ;
@@ -430,7 +430,7 @@ public:
                         strategy <= strategy_[1]; ++strategy)
                         f(
                             window,
-                            compress(check, level, window, Wrap::none, 4, strategy),
+                            compress(check, level, window, wrap::none, 4, strategy),
                             check);
                 }
             }
@@ -535,7 +535,7 @@ public:
             m(Boost{full, once, Flush::trees}, check2);
         }
 #endif
-        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, Wrap::none, 8,  3);
+        check(d, {0x63, 0x18, 0x05, 0x40, 0x0c, 0x00}, {}, wrap::none, 8, 3);
         check(d, {0xed, 0xc0, 0x81, 0x00, 0x00, 0x00, 0x00, 0x80,
                0xa0, 0xfd, 0xa9, 0x17, 0xa9, 0x00, 0x00, 0x00,
                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -546,11 +546,11 @@ public:
 
     static
     std::string check(IDecompressor& d,
-        std::initializer_list<std::uint8_t> const& in,
-        error_code expected,
-        Wrap wrap = Wrap::none,
-        std::size_t window_size = 15,
-        std::size_t len = -1)
+                      std::initializer_list<std::uint8_t> const& in,
+                      error_code expected,
+                      wrap wrap = wrap::none,
+                      std::size_t window_size = 15,
+                      std::size_t len = -1)
     {
         std::string out(1024, 0);
         d.init(static_cast<int>(window_size), wrap);
@@ -628,19 +628,19 @@ public:
     static
     void testInvalidHeader(IDecompressor& d)
     {
-        check(d, {0x14, 0x00}, error::incorrect_header_check, Wrap::zlib);
-        check(d, {0x17, 0x02}, error::unknown_compression_method, Wrap::zlib);
-        check(d, {0xf8, 0x00}, error::invalid_window_size, Wrap::zlib, 10);
-        check(d, {0x1f, 0x8b, 0x07, 0x00}, error::unknown_compression_method, Wrap::gzip);
-        check(d, {0x1f, 0x8b, 0x08, 0xe0}, error::unknown_header_flags, Wrap::gzip);
+        check(d, {0x14, 0x00}, error::incorrect_header_check, wrap::zlib);
+        check(d, {0x17, 0x02}, error::unknown_compression_method, wrap::zlib);
+        check(d, {0xf8, 0x00}, error::invalid_window_size, wrap::zlib, 10);
+        check(d, {0x1f, 0x8b, 0x07, 0x00}, error::unknown_compression_method, wrap::gzip);
+        check(d, {0x1f, 0x8b, 0x08, 0xe0}, error::unknown_header_flags, wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x04,
-                  0x03, 0xff, 0xff}, error::header_crc_mismatch, Wrap::gzip);
+                  0x03, 0xff, 0xff}, error::header_crc_mismatch, wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x00,
                   0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
-                  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, error::incorrect_data_check, Wrap::gzip);
+                  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, error::incorrect_data_check, wrap::gzip);
         check(d, {0x1f, 0x8b, 0x08, 0x00,
                   0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x03, 0x00,
-                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, error::incorrect_length_check, Wrap::gzip);
+                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, error::incorrect_length_check, wrap::gzip);
     }
 
     static
@@ -666,7 +666,7 @@ public:
 
     static void testWrappedStreams() {
         std::string raw = "This is fake content";
-        auto test = [&](Wrap wrap) {
+        auto test = [&](wrap wrap) {
 
           std::string in = compress(raw, 8, 10, wrap, 1, Z_DEFAULT_STRATEGY);
           std::string out;
@@ -692,8 +692,8 @@ public:
           BOOST_TEST(out == raw);
         };
 
-        test(Wrap::zlib);
-        test(Wrap::gzip);
+        test(wrap::zlib);
+        test(wrap::gzip);
     }
 
     static

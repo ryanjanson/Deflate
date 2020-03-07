@@ -96,8 +96,8 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
 
-            if(Wrap(wrap_ % 128) != Wrap::none) {
-                check_ = (Wrap(wrap_ % 128) == Wrap::zlib) ?
+            if(wrap(wrap_ % 128) != wrap::none) {
+                check_ = (wrap(wrap_ % 128) == wrap::zlib) ?
                          adler32(r.out.first, r.out.used(), check_) :
                          crc32(r.out.first, r.out.used(), check_);
             }
@@ -119,8 +119,8 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
     {
         switch(mode_) {
         case HEAD: {
-            const auto wrap = Wrap(wrap_ % 128);
-            if (wrap == Wrap::none) {
+            const auto wrap = boost::deflate::wrap(wrap_ % 128);
+            if (wrap == wrap::none) {
                 mode_ = TYPEDO;
                 break;
             }
@@ -130,14 +130,14 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             std::uint16_t hold;
             bi_.read(hold, 16);
 
-            if (wrap == Wrap::gzip && hold == 0x8b1fU) {
+            if (wrap == wrap::gzip && hold == 0x8b1fU) {
                 check_ = crc32(nullptr, 0);
                 crc32_integral(hold, check_);
                 mode_ = FLAGS;
                 break;
             }
 
-            BOOST_ASSERT(wrap == Wrap::zlib);
+            BOOST_ASSERT(wrap == wrap::zlib);
 
             if ((((hold & 0xffU) << 8U) + (hold >> 8U)) % 31U)
                 return err(error::incorrect_header_check);
@@ -689,14 +689,14 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
         }
 
         case CHECK:
-            if(Wrap(wrap_ % 128) != Wrap::none){
+            if(wrap(wrap_ % 128) != wrap::none){
                 if(!bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
                 bi_.read_all(hold);
 
                 if((wrap_ / 128) && r.out.used())
-                    check_ = (Wrap(wrap_ % 128) == Wrap::zlib) ?
+                    check_ = (wrap(wrap_ % 128) == wrap::zlib) ?
                         adler32(r.out.first, r.out.used(), check_) :
                         crc32(r.out.first, r.out.used(), check_);
 
@@ -707,7 +707,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
             mode_ = LENGTH;
             BOOST_FALLTHROUGH;
         case LENGTH:
-            if(wrap_ / 128 && Wrap(wrap_ % 128) == Wrap::gzip) {
+            if(wrap_ / 128 && wrap(wrap_ % 128) == wrap::gzip) {
                 if(!bi_.fill(32, r.in.next, r.in.last))
                     return done();
                 std::uint32_t hold;
@@ -736,9 +736,9 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
 
 void
 inflate_stream::
-doReset(int windowBits, Wrap wrap, bool check)
+doReset(int windowBits, wrap wrap, bool check)
 {
-    if((windowBits == 0 && wrap == Wrap::zlib)
+    if((windowBits == 0 && wrap == wrap::zlib)
        || (windowBits < 8 || windowBits > 15))
         BOOST_THROW_EXCEPTION(std::domain_error{
           "windowBits out of range"});

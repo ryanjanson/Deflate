@@ -73,7 +73,7 @@ public:
 
         @li `strategy = Strategy::normal`
 
-        @li `wrap = Wrap::none`
+        @li `wrap = wrap::none`
 
         Although the stream is ready to be used immediately
         after construction, any required internal buffers are
@@ -81,7 +81,7 @@ public:
     */
     deflate_stream()
     {
-        reset(6, 15, DEF_MEM_LEVEL, Strategy::normal, Wrap::none);
+        reset(6, 15, default_mem_level, Strategy::normal, wrap::none);
     }
 
     /** Reset the stream and compression settings.
@@ -102,7 +102,7 @@ public:
         int windowBits,
         int memLevel,
         Strategy strategy,
-        Wrap format = Wrap::none)
+        wrap format = wrap::none)
     {
         doReset(level, windowBits, memLevel, strategy, format);
     }

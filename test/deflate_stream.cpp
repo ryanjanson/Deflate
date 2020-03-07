@@ -235,13 +235,13 @@ public:
     }
 
     static
-    std::string decompress(string_view const& in, Wrap wrap = Wrap::none)
+    std::string decompress(string_view const& in, wrap wrap = wrap::none)
     {
         int result;
         std::string out;
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
-        result = inflateInit2(&zs, wrap == Wrap::none ? -15 : 15);
+        result = inflateInit2(&zs, wrap == wrap::none ? -15 : 15);
         if(result != Z_OK)
             throw std::logic_error{"inflateInit2 failed"};
         try
@@ -594,7 +594,7 @@ public:
 
     static void testWrappedStream(){
         std::string raw = "This is fake content";
-        auto test = [&](Wrap wrap){
+        auto test = [&](wrap wrap){
             std::string compr;
             compr.resize(raw.size());
             auto ds = deflate_stream();
@@ -610,9 +610,9 @@ public:
             BOOST_TEST(!ec);
             BOOST_TEST(decompress(compr) == raw);
         };
-        test(Wrap::none);
-        test(Wrap::zlib);
-        test(Wrap::gzip);
+        test(wrap::none);
+        test(wrap::zlib);
+        test(wrap::gzip);
     }
 
     void

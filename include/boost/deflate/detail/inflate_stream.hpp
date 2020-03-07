@@ -63,7 +63,7 @@ protected:
 
     BOOST_DEFLATE_DECL
     void
-    doReset(int windowBits, Wrap wrap, bool check);
+    doReset(int windowBits, wrap wrap, bool check);
 
     BOOST_DEFLATE_DECL
     void
@@ -72,7 +72,7 @@ protected:
     void
     doReset()
     {
-        doReset(w_.bits(), Wrap::none, true);
+        doReset(w_.bits(), wrap::none, true);
     }
 
 private:

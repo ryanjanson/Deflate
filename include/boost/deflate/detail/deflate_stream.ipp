@@ -118,21 +118,21 @@ void
 deflate_stream::
 gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count)
 {
-    std::uint16_t next_code[maxBits+1]; /* next code value for each bit length */
+    std::uint16_t next_code[max_bits + 1]; /* next code value for each bit length */
     std::uint16_t code = 0;              /* running code value */
     int bits;                  /* bit index */
     int n;                     /* code index */
 
     // The distribution counts are first used to
     // generate the code values without bit reversal.
-    for(bits = 1; bits <= maxBits; bits++)
+    for(bits = 1; bits <= max_bits; bits++)
     {
         code = (code + bl_count[bits-1]) << 1;
         next_code[bits] = code;
     }
     // Check that the bit counts in bl_count are consistent.
     // The last code must be all ones.
-    BOOST_ASSERT(code + bl_count[maxBits]-1 == (1<<maxBits)-1);
+    BOOST_ASSERT(code + bl_count[max_bits] - 1 == (1 << max_bits) - 1);
     for(n = 0; n <= max_code; n++)
     {
         int len = tree[n].dl;
@@ -153,11 +153,11 @@ deflate_stream::get_lut() ->
         init()
         {
             // number of codes at each bit length for an optimal tree
-            //std::uint16_t bl_count[maxBits+1];
+            //std::uint16_t bl_count[max_bits+1];
 
             // Initialize the mapping length (0..255) -> length code (0..28)
             std::uint8_t length = 0;
-            for(std::uint8_t code = 0; code < lengthCodes-1; ++code)
+            for(std::uint8_t code = 0; code < length_codes - 1; ++code)
             {
                 tables.base_length[code] = length;
                 auto const run = 1U << tables.extra_lbits[code];
@@ -168,7 +168,7 @@ deflate_stream::get_lut() ->
             // Note that the length 255 (match length 258) can be represented
             // in two different ways: code 284 + 5 bits or code 285, so we
             // overwrite length_code[255] to use the best encoding:
-            tables.length_code[255] = lengthCodes-1;
+            tables.length_code[255] = length_codes - 1;
 
             // Initialize the mapping dist (0..32K) -> dist code (0..29)
             {
@@ -184,7 +184,7 @@ deflate_stream::get_lut() ->
                 BOOST_ASSERT(dist == 256);
                 // from now on, all distances are divided by 128
                 dist >>= 7;
-                for(; code < dCodes; ++code)
+                for(; code < dcodes; ++code)
                 {
                     tables.base_dist[code] = dist << 7;
                     auto const run = 1U << (tables.extra_dbits[code]-7);
@@ -195,7 +195,7 @@ deflate_stream::get_lut() ->
             }
 
             // Construct the codes of the static literal tree
-            std::uint16_t bl_count[maxBits+1];
+            std::uint16_t bl_count[max_bits + 1];
             std::memset(bl_count, 0, sizeof(bl_count));
             unsigned n = 0;
             while (n <= 143)
@@ -212,9 +212,9 @@ deflate_stream::get_lut() ->
             bl_count[8] += 8;
             // Codes 286 and 287 do not exist, but we must include them in the tree
             // construction to get a canonical Huffman tree (longest code all ones)
-            gen_codes(tables.ltree, lCodes+1, bl_count);
+            gen_codes(tables.ltree, lcodes + 1, bl_count);
 
-            for(n = 0; n < dCodes; ++n)
+            for(n = 0; n < dcodes; ++n)
             {
                 tables.dtree[n].dl = 5;
                 tables.dtree[n].fc =
@@ -233,7 +233,7 @@ doReset(
     int windowBits,
     int memLevel,
     Strategy strategy,
-    Wrap wrap)
+    wrap wrap)
 {
     if(level == default_size)
         level = 6;
@@ -429,7 +429,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
 
 ///ZLIB|DYN
     // Write the header
-    if(status_ == HEAD_STATE) {
+    if(status_ == StreamStatus::head_state) {
         // zlib header
         std::uint16_t header = (ZMTH_DEFLATED | (w_bits_ - 8)
                                 << ZCINFO_MASK_TZ) << 8;
@@ -465,7 +465,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
     }
 ///~ZLIB|DYN
 ///GZIP|DYN
-    if(status_ == GZIP_STATE) {
+    if(status_ == StreamStatus::gzip_state) {
         // gzip
         zs.check = crc32(nullptr, 0);
         //FIXME no magic number
@@ -504,10 +504,10 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
             if(gzhead_->hcrc)
                 zs.check = crc32(pending_buf_, pending_, zs.check);
             gzindex_ = 0;
-            status_ = EXTRA_STATE;
+            status_ = StreamStatus::EXTRA_STATE;
         }
     }
-    if(status_ == EXTRA_STATE) {
+    if(status_ == StreamStatus::EXTRA_STATE) {
         if(!gzhead_->extra.empty()) {
             auto beg = pending_;
             auto left = (gzhead_->extra.length() & 0xffff) - gzindex_;
@@ -532,9 +532,9 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
             hcrc_update(beg);
             gzindex_ = 0;
         }
-        status_ = NAME_STATE;
+        status_ = StreamStatus::NAME_STATE;
     }
-    if(status_ == NAME_STATE) {
+    if(status_ == StreamStatus::NAME_STATE) {
         if(!gzhead_->name.empty()) {
             auto beg = pending_;
             char c;
@@ -679,7 +679,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
         return;
 
 ///DYN
-    if(wrap_ == Wrap::none) {
+    if(wrap_ == wrap::none) {
 ///~DYN
 ///DYN|NONE
         ec = error::end_of_stream;
@@ -691,7 +691,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
 
     // Write the trailer
 ///GZIP|DYN
-    if(wrap_ == Wrap::gzip) {
+    if(wrap_ == wrap::gzip) {
         put_long(zs.check);
         put_long(zs.total_in);
     }
@@ -742,27 +742,27 @@ doDictionary(Byte const* dict, uInt dictLength, error_code& ec)
     zs.avail_out = 0;
     zs.next_out = 0;
     fill_window(zs);
-    while(lookahead_ >= minMatch)
+    while(lookahead_ >= min_match)
     {
         uInt str = strstart_;
-        uInt n = lookahead_ - (minMatch-1);
+        uInt n = lookahead_ - (min_match - 1);
         do
         {
-            update_hash(ins_h_, window_[str + minMatch-1]);
+            update_hash(ins_h_, window_[str + min_match - 1]);
             prev_[str & w_mask_] = head_[ins_h_];
             head_[ins_h_] = (std::uint16_t)str;
             str++;
         }
         while(--n);
         strstart_ = str;
-        lookahead_ = minMatch-1;
+        lookahead_ = min_match - 1;
         fill_window(zs);
     }
     strstart_ += lookahead_;
     block_start_ = (long)strstart_;
     insert_ = lookahead_;
     lookahead_ = 0;
-    match_length_ = prev_length_ = minMatch-1;
+    match_length_ = prev_length_ = min_match - 1;
     match_available_ = 0;
 }
 
@@ -773,7 +773,7 @@ doPrime(int bits, int value, error_code& ec)
     maybe_init();
 
     if(bits < 0 || bits > 16 ||
-        (Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
+        (Byte *)(d_buf_) < pending_out_ + ((buf_size + 7) >> 3))
     {
         ec = error::need_buffers;
         return;
@@ -781,7 +781,7 @@ doPrime(int bits, int value, error_code& ec)
 
     do
     {
-        int put = Buf_size - bi_valid_;
+        int put = buf_size - bi_valid_;
         if(put > bits)
             put = bits;
         bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
@@ -822,7 +822,7 @@ init()
 
     hash_size_ = 1 << hash_bits_;
     hash_mask_ = hash_size_ - 1;
-    hash_shift_ =  ((hash_bits_+minMatch-1)/minMatch);
+    hash_shift_ =  ((hash_bits_ + min_match - 1) / min_match);
 
     auto const nwindow  = w_size_ * 2*sizeof(Byte);
     auto const nprev    = w_size_ * sizeof(std::uint16_t);
@@ -894,7 +894,7 @@ lm_init()
     block_start_ = 0L;
     lookahead_ = 0;
     insert_ = 0;
-    match_length_ = prev_length_ = minMatch-1;
+    match_length_ = prev_length_ = min_match - 1;
     match_available_ = 0;
     ins_h_ = 0;
 }
@@ -905,13 +905,13 @@ void
 deflate_stream::
 init_block()
 {
-    for(int n = 0; n < lCodes;  n++)
+    for(int n = 0; n < lcodes; n++)
         dyn_ltree_[n].fc = 0;
-    for(int n = 0; n < dCodes;  n++)
+    for(int n = 0; n < dcodes; n++)
         dyn_dtree_[n].fc = 0;
-    for(int n = 0; n < blCodes; n++)
+    for(int n = 0; n < bl_codes; n++)
         bl_tree_[n].fc = 0;
-    dyn_ltree_[END_BLOCK].fc = 1;
+    dyn_ltree_[end_block].fc = 1;
     opt_len_ = 0L;
     static_len_ = 0L;
     last_lit_ = 0;
@@ -990,14 +990,14 @@ gen_bitlen(tree_desc *desc)
     std::uint16_t f;                // frequency
     int overflow = 0;               // number of elements with bit length too large
 
-    std::fill(&bl_count_[0], &bl_count_[maxBits+1], std::uint16_t{0});
+    std::fill(&bl_count_[0], &bl_count_[max_bits + 1], std::uint16_t{0});
 
     /* In a first pass, compute the optimal bit lengths (which may
      * overflow in the case of the bit length tree).
      */
     tree[heap_[heap_max_]].dl = 0; // root of the heap
 
-    for(h = heap_max_+1; h < HEAP_SIZE; h++) {
+    for(h = heap_max_+1; h < heap_size; h++) {
         n = heap_[h];
         bits = tree[tree[n].dl].dl + 1;
         if(bits > max_length) bits = max_length, overflow++;
@@ -1036,7 +1036,7 @@ gen_bitlen(tree_desc *desc)
     while(overflow > 0);
 
     /* Now recompute all bit lengths, scanning in increasing frequency.
-     * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
+     * h is still equal to heap_size. (It is simpler to reconstruct all
      * lengths instead of fixing only the wrong ones. This idea is taken
      * from 'ar' written by Haruhiko Okumura.)
      */
@@ -1081,7 +1081,7 @@ build_tree(tree_desc *desc)
      * heap[0] is not used.
      */
     heap_len_ = 0;
-    heap_max_ = HEAP_SIZE;
+    heap_max_ = heap_size;
 
     for(n = 0; n < elems; n++)
     {
@@ -1192,15 +1192,15 @@ scan_tree(
         else if(curlen != 0)
         {
             if(curlen != prevlen) bl_tree_[curlen].fc++;
-                bl_tree_[REP_3_6].fc++;
+                bl_tree_[rep_3_6].fc++;
         }
         else if(count <= 10)
         {
-            bl_tree_[REPZ_3_10].fc++;
+            bl_tree_[repz_3_10].fc++;
         }
         else
         {
-            bl_tree_[REPZ_11_138].fc++;
+            bl_tree_[repz].fc++;
         }
         count = 0;
         prevlen = curlen;
@@ -1270,17 +1270,17 @@ send_tree(
                 count--;
             }
             BOOST_ASSERT(count >= 3 && count <= 6);
-            send_code(REP_3_6, bl_tree_);
+            send_code(rep_3_6, bl_tree_);
             send_bits(count-3, 2);
         }
         else if(count <= 10)
         {
-            send_code(REPZ_3_10, bl_tree_);
+            send_code(repz_3_10, bl_tree_);
             send_bits(count-3, 3);
         }
         else
         {
-            send_code(REPZ_11_138, bl_tree_);
+            send_code(repz, bl_tree_);
             send_bits(count-11, 7);
         }
         count = 0;
@@ -1326,7 +1326,7 @@ build_bl_tree()
      * requires that at least 4 bit length codes be sent. (appnote.txt says
      * 3 but the actual value used is 4.)
      */
-    for(max_blindex = blCodes-1; max_blindex >= 3; max_blindex--)
+    for(max_blindex = bl_codes - 1; max_blindex >= 3; max_blindex--)
     {
         if(bl_tree_[lut_.bl_order[max_blindex]].dl != 0)
             break;
@@ -1351,7 +1351,7 @@ send_all_trees(
     int rank;       // index in bl_order
 
     BOOST_ASSERT(lcodes >= 257 && dcodes >= 1 && blcodes >= 4);
-    BOOST_ASSERT(lcodes <= lCodes && dcodes <= dCodes && blcodes <= blCodes);
+    BOOST_ASSERT(lcodes <= lcodes && dcodes <= dcodes && blcodes <= bl_codes);
     send_bits(lcodes-257, 5); // not +255 as stated in appnote.txt
     send_bits(dcodes-1,   5);
     send_bits(blcodes-4,  4); // not -3 as stated in appnote.txt
@@ -1387,7 +1387,7 @@ compress_block(
             }
             else
             {
-                /* Here, lc is the match length - minMatch */
+                /* Here, lc is the match length - min_match */
                 code = lut_.length_code[lc];
                 send_code(code+literals+1, ltree); /* send the length code */
                 extra = lut_.extra_lbits[code];
@@ -1398,7 +1398,7 @@ compress_block(
                 }
                 dist--; /* dist is now the match distance - 1 */
                 code = d_code(dist);
-                BOOST_ASSERT(code < dCodes);
+                BOOST_ASSERT(code < dcodes);
 
                 send_code(code, dtree);       /* send the distance code */
                 extra = lut_.extra_dbits[code];
@@ -1415,7 +1415,7 @@ compress_block(
         while(lx < last_lit_);
     }
 
-    send_code(END_BLOCK, ltree);
+    send_code(end_block, ltree);
 }
 
 /*  Check if the data type is TEXT or BINARY, using the following algorithm:
@@ -1547,8 +1547,8 @@ void
 deflate_stream::
 tr_align()
 {
-    send_bits(STATIC_TREES<<1, 3);
-    send_code(END_BLOCK, lut_.ltree);
+    send_bits(static_trees << 1, 3);
+    send_code(end_block, lut_.ltree);
     bi_flush();
 }
 
@@ -1570,7 +1570,7 @@ tr_stored_block(
     std::uint32_t stored_len,   // length of input block
     int last)                   // one if this is the last block for a file
 {
-    send_bits((STORED_BLOCK<<1)+last, 3);       // send block type
+    send_bits((stored_blocks << 1) + last, 3);       // send block type
     copy_block(buf, (unsigned)stored_len, 1);   // with header
 }
 
@@ -1676,12 +1676,12 @@ tr_flush_block(
     else if(strategy_ == Strategy::fixed || static_lenb == opt_lenb)
     {
 #endif
-        send_bits((STATIC_TREES<<1)+last, 3);
+        send_bits((static_trees << 1) + last, 3);
         compress_block(lut_.ltree, lut_.dtree);
     }
     else
     {
-        send_bits((DYN_TREES<<1)+last, 3);
+        send_bits((dynamic_trees << 1) + last, 3);
         send_all_trees(l_desc_.max_code+1, d_desc_.max_code+1,
                        max_blindex+1);
         compress_block((const ct_data *)dyn_ltree_,
@@ -1754,13 +1754,13 @@ fill_window(z_params& zs)
             break;
 
         /*  If there was no sliding:
-               strstart <= WSIZE+max_dist-1 && lookahead <= kMinLookahead - 1 &&
+               strstart <= WSIZE+max_dist-1 && lookahead <= kmin_lookahead - 1 &&
                more == window_size - lookahead - strstart
-            => more >= window_size - (kMinLookahead-1 + WSIZE + max_dist-1)
+            => more >= window_size - (kmin_lookahead-1 + WSIZE + max_dist-1)
             => more >= window_size - 2*WSIZE + 2
             In the BIG_MEM or MMAP case (not yet supported),
-              window_size == input_size + kMinLookahead  &&
-              strstart + lookahead_ <= input_size => more >= kMinLookahead.
+              window_size == input_size + kmin_lookahead  &&
+              strstart + lookahead_ <= input_size => more >= kmin_lookahead.
             Otherwise, window_size == 2*WSIZE so more >= 2.
             If there was sliding, more >= WSIZE. So in all cases, more >= 2.
         */
@@ -1768,34 +1768,34 @@ fill_window(z_params& zs)
         lookahead_ += n;
 
         // Initialize the hash value now that we have some input:
-        if(lookahead_ + insert_ >= minMatch)
+        if(lookahead_ + insert_ >= min_match)
         {
             uInt str = strstart_ - insert_;
             ins_h_ = window_[str];
             update_hash(ins_h_, window_[str + 1]);
             while(insert_)
             {
-                update_hash(ins_h_, window_[str + minMatch-1]);
+                update_hash(ins_h_, window_[str + min_match - 1]);
                 prev_[str & w_mask_] = head_[ins_h_];
                 head_[ins_h_] = (std::uint16_t)str;
                 str++;
                 insert_--;
-                if(lookahead_ + insert_ < minMatch)
+                if(lookahead_ + insert_ < min_match)
                     break;
             }
         }
-        /*  If the whole input has less than minMatch bytes, ins_h is garbage,
+        /*  If the whole input has less than min_match bytes, ins_h is garbage,
             but this is not important since only literal bytes will be emitted.
         */
     }
-    while(lookahead_ < kMinLookahead && zs.avail_in != 0);
+    while(lookahead_ < kmin_lookahead && zs.avail_in != 0);
 
-    /*  If the kWinInit bytes after the end of the current data have never been
+    /*  If the kwin_init bytes after the end of the current data have never been
         written, then zero those bytes in order to avoid memory check reports of
         the use of uninitialized (or uninitialised as Julian writes) bytes by
         the longest match routines.  Update the high water mark for the next
-        time through here.  kWinInit is set to maxMatch since the longest match
-        routines allow scanning to strstart + maxMatch, ignoring lookahead.
+        time through here.  kwin_init is set to max_match since the longest match
+        routines allow scanning to strstart + max_match, ignoring lookahead.
     */
     if(high_water_ < window_size_)
     {
@@ -1804,22 +1804,22 @@ fill_window(z_params& zs)
 
         if(high_water_ < curr)
         {
-            /*  Previous high water mark below current data -- zero kWinInit
+            /*  Previous high water mark below current data -- zero kwin_init
                 bytes or up to end of window, whichever is less.
             */
             winit = window_size_ - curr;
-            if(winit > kWinInit)
-                winit = kWinInit;
+            if(winit > kwin_init)
+                winit = kwin_init;
             std::memset(window_ + curr, 0, (unsigned)winit);
             high_water_ = curr + winit;
         }
-        else if(high_water_ < (std::uint32_t)curr + kWinInit)
+        else if(high_water_ < (std::uint32_t)curr + kwin_init)
         {
             /*  High water mark at or above current data, but below current data
-                plus kWinInit -- zero out to current data plus kWinInit, or up
+                plus kwin_init -- zero out to current data plus kwin_init, or up
                 to end of window, whichever is less.
             */
-            winit = (std::uint32_t)curr + kWinInit - high_water_;
+            winit = (std::uint32_t)curr + kwin_init - high_water_;
             if(winit > window_size_ - high_water_)
                 winit = window_size_ - high_water_;
             std::memset(window_ + high_water_, 0, (unsigned)winit);
@@ -1888,13 +1888,13 @@ read_buf(z_params& zs, Byte *buf, unsigned size)
 
     std::memcpy(buf, zs.next_in, len);
 ///DYN
-    if(wrap_ == Wrap::zlib){;
+    if(wrap_ == wrap::zlib){;
 ///~DYN
 ///ZLIB|DYN
         zs.check = adler32(buf, len, zs.check);
 ///~ZLIB|DYN
 ///DYN
-    } else if(wrap_ == Wrap::gzip) {
+    } else if(wrap_ == wrap::gzip) {
 ///~DYN
 ///GZIP|DYN
         zs.check = crc32(buf, len, zs.check);
@@ -1937,14 +1937,14 @@ longest_match(IPos cur_match)
     std::uint16_t *prev = prev_;
     uInt wmask = w_mask_;
 
-    Byte *strend = window_ + strstart_ + maxMatch;
+    Byte *strend = window_ + strstart_ + max_match;
     Byte scan_end1  = scan[best_len-1];
     Byte scan_end   = scan[best_len];
 
-    /* The code is optimized for HASH_BITS >= 8 and maxMatch-2 multiple of 16.
+    /* The code is optimized for HASH_BITS >= 8 and max_match-2 multiple of 16.
      * It is easy to get rid of this optimization if necessary.
      */
-    BOOST_ASSERT(hash_bits_ >= 8 && maxMatch == 258);
+    BOOST_ASSERT(hash_bits_ >= 8 && max_match == 258);
 
     /* Do not waste too much time if we already have a good match: */
     if(prev_length_ >= good_match_) {
@@ -1956,7 +1956,7 @@ longest_match(IPos cur_match)
     if((uInt)nice_match > lookahead_)
         nice_match = lookahead_;
 
-    BOOST_ASSERT((std::uint32_t)strstart_ <= window_size_-kMinLookahead);
+    BOOST_ASSERT((std::uint32_t)strstart_ <= window_size_ - kmin_lookahead);
 
     do {
         BOOST_ASSERT(cur_match < strstart_);
@@ -1999,8 +1999,8 @@ longest_match(IPos cur_match)
 
         BOOST_ASSERT(scan <= window_+(unsigned)(window_size_-1));
 
-        len = maxMatch - (int)(strend - scan);
-        scan = strend - maxMatch;
+        len = max_match - (int)(strend - scan);
+        scan = strend - max_match;
 
         if(len > best_len) {
             match_start_ = cur_match;
@@ -2115,14 +2115,14 @@ f_fast(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need maxMatch bytes
-         * for the next match, plus minMatch bytes to insert the
+         * at the end of the input file. We need max_match bytes
+         * for the next match, plus min_match bytes to insert the
          * string following the next match.
          */
-        if(lookahead_ < kMinLookahead)
+        if(lookahead_ < kmin_lookahead)
         {
             fill_window(zs);
-            if(lookahead_ < kMinLookahead && flush == Flush::none)
+            if(lookahead_ < kmin_lookahead && flush == Flush::none)
                 return need_more;
             if(lookahead_ == 0)
                 break; /* flush the current block */
@@ -2132,12 +2132,12 @@ f_fast(z_params& zs, Flush flush) ->
          * dictionary, and set hash_head to the head of the hash chain:
          */
         hash_head = 0;
-        if(lookahead_ >= minMatch) {
+        if(lookahead_ >= min_match) {
             insert_string(hash_head);
         }
 
         /* Find the longest match, discarding those <= prev_length.
-         * At this point we have always match_length < minMatch
+         * At this point we have always match_length < min_match
          */
         if(hash_head != 0 && strstart_ - hash_head <= max_dist()) {
             /* To simplify the code, we prevent matches with the string
@@ -2147,10 +2147,10 @@ f_fast(z_params& zs, Flush flush) ->
             match_length_ = longest_match (hash_head);
             /* longest_match() sets match_start */
         }
-        if(match_length_ >= minMatch)
+        if(match_length_ >= min_match)
         {
             tr_tally_dist(static_cast<std::uint16_t>(strstart_ - match_start_),
-                static_cast<std::uint8_t>(match_length_ - minMatch), bflush);
+                          static_cast<std::uint8_t>(match_length_ - min_match), bflush);
 
             lookahead_ -= match_length_;
 
@@ -2158,14 +2158,14 @@ f_fast(z_params& zs, Flush flush) ->
              * is not too large. This saves time but degrades compression.
              */
             if(match_length_ <= max_lazy_match_ &&
-                lookahead_ >= minMatch) {
+               lookahead_ >= min_match) {
                 match_length_--; /* string at strstart already in table */
                 do
                 {
                     strstart_++;
                     insert_string(hash_head);
-                    /* strstart never exceeds WSIZE-maxMatch, so there are
-                     * always minMatch bytes ahead.
+                    /* strstart never exceeds WSIZE-max_match, so there are
+                     * always min_match bytes ahead.
                      */
                 }
                 while(--match_length_ != 0);
@@ -2177,7 +2177,7 @@ f_fast(z_params& zs, Flush flush) ->
                 match_length_ = 0;
                 ins_h_ = window_[strstart_];
                 update_hash(ins_h_, window_[strstart_+1]);
-                /* If lookahead < minMatch, ins_h is garbage, but it does not
+                /* If lookahead < min_match, ins_h is garbage, but it does not
                  * matter since it will be recomputed at next deflate call.
                  */
             }
@@ -2196,7 +2196,7 @@ f_fast(z_params& zs, Flush flush) ->
                 return need_more;
         }
     }
-    insert_ = strstart_ < minMatch-1 ? strstart_ : minMatch-1;
+    insert_ = strstart_ < min_match - 1 ? strstart_ : min_match - 1;
     if(flush == Flush::finish)
     {
         flush_block(zs, true);
@@ -2229,14 +2229,14 @@ f_slow(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need maxMatch bytes
-         * for the next match, plus minMatch bytes to insert the
+         * at the end of the input file. We need max_match bytes
+         * for the next match, plus min_match bytes to insert the
          * string following the next match.
          */
-        if(lookahead_ < kMinLookahead)
+        if(lookahead_ < kmin_lookahead)
         {
             fill_window(zs);
-            if(lookahead_ < kMinLookahead && flush == Flush::none)
+            if(lookahead_ < kmin_lookahead && flush == Flush::none)
                 return need_more;
             if(lookahead_ == 0)
                 break; /* flush the current block */
@@ -2246,13 +2246,13 @@ f_slow(z_params& zs, Flush flush) ->
          * dictionary, and set hash_head to the head of the hash chain:
          */
         hash_head = 0;
-        if(lookahead_ >= minMatch)
+        if(lookahead_ >= min_match)
             insert_string(hash_head);
 
         /* Find the longest match, discarding those <= prev_length.
          */
         prev_length_ = match_length_, prev_match_ = match_start_;
-        match_length_ = minMatch-1;
+        match_length_ = min_match - 1;
 
         if(hash_head != 0 && prev_length_ < max_lazy_match_ &&
             strstart_ - hash_head <= max_dist())
@@ -2265,27 +2265,27 @@ f_slow(z_params& zs, Flush flush) ->
             /* longest_match() sets match_start */
 
             if(match_length_ <= 5 && (strategy_ == Strategy::filtered
-                || (match_length_ == minMatch &&
-                    strstart_ - match_start_ > kTooFar)
+                || (match_length_ == min_match &&
+                    strstart_ - match_start_ > ktoo_far)
                 ))
             {
-                /* If prev_match is also minMatch, match_start is garbage
+                /* If prev_match is also min_match, match_start is garbage
                  * but we will ignore the current match anyway.
                  */
-                match_length_ = minMatch-1;
+                match_length_ = min_match - 1;
             }
         }
         /* If there was a match at the previous step and the current
          * match is not better, output the previous match:
          */
-        if(prev_length_ >= minMatch && match_length_ <= prev_length_)
+        if(prev_length_ >= min_match && match_length_ <= prev_length_)
         {
             /* Do not insert strings in hash table beyond this. */
-            uInt max_insert = strstart_ + lookahead_ - minMatch;
+            uInt max_insert = strstart_ + lookahead_ - min_match;
 
             tr_tally_dist(
                 static_cast<std::uint16_t>(strstart_ -1 - prev_match_),
-                static_cast<std::uint8_t>(prev_length_ - minMatch), bflush);
+                static_cast<std::uint8_t>(prev_length_ - min_match), bflush);
 
             /* Insert in hash table all strings up to the end of the match.
              * strstart-1 and strstart are already inserted. If there is not
@@ -2300,7 +2300,7 @@ f_slow(z_params& zs, Flush flush) ->
             }
             while(--prev_length_ != 0);
             match_available_ = 0;
-            match_length_ = minMatch-1;
+            match_length_ = min_match - 1;
             strstart_++;
 
             if(bflush)
@@ -2341,7 +2341,7 @@ f_slow(z_params& zs, Flush flush) ->
         tr_tally_lit(window_[strstart_-1], bflush);
         match_available_ = 0;
     }
-    insert_ = strstart_ < minMatch-1 ? strstart_ : minMatch-1;
+    insert_ = strstart_ < min_match - 1 ? strstart_ : min_match - 1;
     if(flush == Flush::finish)
     {
         flush_block(zs, true);
@@ -2374,12 +2374,12 @@ f_rle(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need maxMatch bytes
+         * at the end of the input file. We need max_match bytes
          * for the longest run, plus one for the unrolled loop.
          */
-        if(lookahead_ <= maxMatch) {
+        if(lookahead_ <= max_match) {
             fill_window(zs);
-            if(lookahead_ <= maxMatch && flush == Flush::none) {
+            if(lookahead_ <= max_match && flush == Flush::none) {
                 return need_more;
             }
             if(lookahead_ == 0) break; /* flush the current block */
@@ -2387,28 +2387,28 @@ f_rle(z_params& zs, Flush flush) ->
 
         /* See how many times the previous byte repeats */
         match_length_ = 0;
-        if(lookahead_ >= minMatch && strstart_ > 0) {
+        if(lookahead_ >= min_match && strstart_ > 0) {
             scan = window_ + strstart_ - 1;
             prev = *scan;
             if(prev == *++scan && prev == *++scan && prev == *++scan) {
-                strend = window_ + strstart_ + maxMatch;
+                strend = window_ + strstart_ + max_match;
                 do {
                 } while(prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          scan < strend);
-                match_length_ = maxMatch - (int)(strend - scan);
+                match_length_ = max_match - (int)(strend - scan);
                 if(match_length_ > lookahead_)
                     match_length_ = lookahead_;
             }
             BOOST_ASSERT(scan <= window_+(uInt)(window_size_-1));
         }
 
-        /* Emit match if have run of minMatch or longer, else emit literal */
-        if(match_length_ >= minMatch) {
+        /* Emit match if have run of min_match or longer, else emit literal */
+        if(match_length_ >= min_match) {
             tr_tally_dist(std::uint16_t{1},
-                static_cast<std::uint8_t>(match_length_ - minMatch),
+                static_cast<std::uint8_t>(match_length_ - min_match),
                 bflush);
 
             lookahead_ -= match_length_;

@@ -61,81 +61,81 @@ class deflate_stream
 {
 protected:
     // Upper limit on code length
-    static std::uint8_t constexpr maxBits = 15;
+    static std::uint8_t constexpr max_bits = 15;
 
     // Number of length codes, not counting the special END_BLOCK code
-    static std::uint16_t constexpr lengthCodes = 29;
+    static std::uint16_t constexpr length_codes = 29;
 
     // Number of literal bytes 0..255
     static std::uint16_t constexpr literals = 256;
 
     // Number of Literal or Length codes, including the END_BLOCK code
-    static std::uint16_t constexpr lCodes = literals + 1 + lengthCodes;
+    static std::uint16_t constexpr lcodes = literals + 1 + length_codes;
 
     // Number of distance code lengths
-    static std::uint16_t constexpr dCodes = 30;
+    static std::uint16_t constexpr dcodes = 30;
 
     // Number of codes used to transfer the bit lengths
-    static std::uint16_t constexpr blCodes = 19;
+    static std::uint16_t constexpr bl_codes = 19;
 
     // Number of distance codes
-    static std::uint16_t constexpr distCodeLen = 512;
+    static std::uint16_t constexpr dist_code_len = 512;
 
     // Size limit on bit length codes
-    static std::uint8_t constexpr maxBlBits = 7;
+    static std::uint8_t constexpr max_bl_bits = 7;
 
-    static std::uint16_t constexpr minMatch = 3;
-    static std::uint16_t constexpr maxMatch = 258;
+    static std::uint16_t constexpr min_match = 3;
+    static std::uint16_t constexpr max_match = 258;
 
-    // Can't change minMatch without also changing code, see original zlib
-    BOOST_STATIC_ASSERT(minMatch == 3);
+    // Can't change min_match without also changing code, see original zlib
+    BOOST_STATIC_ASSERT(min_match == 3);
 
     // end of block literal code
-    static std::uint16_t constexpr END_BLOCK = 256;
+    static std::uint16_t constexpr end_block = 256;
 
     // repeat previous bit length 3-6 times (2 bits of repeat count)
-    static std::uint8_t constexpr REP_3_6 = 16;
+    static std::uint8_t constexpr rep_3_6 = 16;
 
     // repeat a zero length 3-10 times  (3 bits of repeat count)
-    static std::uint8_t constexpr REPZ_3_10 = 17;
+    static std::uint8_t constexpr repz_3_10 = 17;
 
     // repeat a zero length 11-138 times  (7 bits of repeat count)
-    static std::uint8_t constexpr REPZ_11_138 = 18;
+    static std::uint8_t constexpr repz = 18;
 
     // The three kinds of block type
-    static std::uint8_t constexpr STORED_BLOCK = 0;
-    static std::uint8_t constexpr STATIC_TREES = 1;
-    static std::uint8_t constexpr DYN_TREES    = 2;
+    static std::uint8_t constexpr stored_blocks = 0;
+    static std::uint8_t constexpr static_trees = 1;
+    static std::uint8_t constexpr dynamic_trees    = 2;
 
     // Maximum value for memLevel in deflateInit2
     static std::uint8_t constexpr max_mem_level = 9;
 
     // Default memLevel
-    static std::uint8_t constexpr DEF_MEM_LEVEL = max_mem_level;
+    static std::uint8_t constexpr default_mem_level = max_mem_level;
 
-    /*  Note: the deflate() code requires max_lazy >= minMatch and max_chain >= 4
+    /*  Note: the deflate() code requires max_lazy >= min_match and max_chain >= 4
         For deflate_fast() (levels <= 3) good is ignored and lazy has a different
         meaning.
     */
 
     // maximum heap size
-    static std::uint16_t constexpr HEAP_SIZE = 2 * lCodes + 1;
+    static std::uint16_t constexpr heap_size = 2 * lcodes + 1;
 
     // size of bit buffer in bi_buf
-    static std::uint8_t constexpr Buf_size = 16;
+    static std::uint8_t constexpr buf_size = 16;
 
-    // Matches of length 3 are discarded if their distance exceeds kTooFar
-    static std::size_t constexpr kTooFar = 4096;
+    // Matches of length 3 are discarded if their distance exceeds ktoo_far
+    static std::size_t constexpr ktoo_far = 4096;
 
     /*  Minimum amount of lookahead, except at the end of the input file.
-        See deflate.c for comments about the minMatch+1.
+        See deflate.c for comments about the min_match+1.
     */
-    static std::size_t constexpr kMinLookahead = maxMatch + minMatch+1;
+    static std::size_t constexpr kmin_lookahead = max_match + min_match + 1;
 
     /*  Number of bytes after end of data in window to initialize in order
         to avoid memory checker errors from longest match routines
     */
-    static std::size_t constexpr kWinInit = maxMatch;
+    static std::size_t constexpr kwin_init = max_match;
 
     // Describes a single value and its code string.
     struct ct_data
@@ -162,53 +162,53 @@ protected:
     struct lut_type
     {
         // Number of extra bits for each length code
-        std::uint8_t const extra_lbits[lengthCodes] = {
+        std::uint8_t const extra_lbits[length_codes] = {
             0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
         };
 
         // Number of extra bits for each distance code
-        std::uint8_t const extra_dbits[dCodes] = {
+        std::uint8_t const extra_dbits[dcodes] = {
             0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13
         };
 
         // Number of extra bits for each bit length code
-        std::uint8_t const extra_blbits[blCodes] = {
+        std::uint8_t const extra_blbits[bl_codes] = {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7
         };
 
         // The lengths of the bit length codes are sent in order
         // of decreasing probability, to avoid transmitting the
         // lengths for unused bit length codes.
-        std::uint8_t const bl_order[blCodes] = {
+        std::uint8_t const bl_order[bl_codes] = {
             16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15
         };
 
-        ct_data ltree[lCodes + 2];
+        ct_data ltree[lcodes + 2];
 
-        ct_data dtree[dCodes];
+        ct_data dtree[dcodes];
 
         // Distance codes. The first 256 values correspond to the distances
         // 3 .. 258, the last 256 values correspond to the top 8 bits of
         // the 15 bit distances.
-        std::uint8_t dist_code[distCodeLen];
+        std::uint8_t dist_code[dist_code_len];
 
-        std::uint8_t length_code[maxMatch-minMatch+1];
+        std::uint8_t length_code[max_match - min_match + 1];
 
-        std::uint8_t base_length[lengthCodes];
+        std::uint8_t base_length[length_codes];
 
-        std::uint16_t base_dist[dCodes];
+        std::uint16_t base_dist[dcodes];
 
         static_desc l_desc = {
-            ltree, extra_lbits, literals+1, lCodes, maxBits
+            ltree, extra_lbits, literals+1, lcodes, max_bits
         };
 
         static_desc d_desc = {
-            dtree, extra_dbits, 0, dCodes, maxBits
+            dtree, extra_dbits, 0, dcodes, max_bits
         };
 
         static_desc bl_desc =
         {
-            nullptr, extra_blbits, 0, blCodes, maxBlBits
+            nullptr, extra_blbits, 0, bl_codes, max_bl_bits
         };
     };
 
@@ -229,8 +229,8 @@ protected:
 
     enum StreamStatus
     {
-        HEAD_STATE = 42,
-        GZIP_STATE = 57,
+        head_state = 42,
+        gzip_state = 57,
         EXTRA_STATE = 69,
         NAME_STATE = 73,
         COMMENT_STATE = 91,
@@ -261,7 +261,7 @@ protected:
         pending_buf_size_;          // size of pending_buf
     Byte* pending_out_;             // next pending byte to output to the stream
     uInt pending_;                  // nb of bytes in the pending buffer
-    Wrap wrap_;                     // stream wrapper
+    wrap wrap_;                     // stream wrapper
     gz_header* gzhead_;             // pointer to gzip header
     std::uint32_t gzindex_;         // where in extra, name, or comment (gzip)
     boost::optional<Flush>
@@ -274,7 +274,7 @@ protected:
     /*  Sliding window. Input bytes are read into the second half of the window,
         and move to the first half later to keep a dictionary of at least wSize
         bytes. With this organization, matches are limited to a distance of
-        wSize-maxMatch bytes, but this ensures that IO is always
+        wSize-max_match bytes, but this ensures that IO is always
         performed with a length multiple of the block size. Also, it limits
         the window size to 64K.
         To do: use the user input buffer as sliding window.
@@ -300,9 +300,9 @@ protected:
     uInt  hash_mask_;               // hash_size-1
 
     /*  Number of bits by which ins_h must be shifted at each input
-        step. It must be such that after minMatch steps,
+        step. It must be such that after min_match steps,
         the oldest byte no longer takes part in the hash key, that is:
-        hash_shift * minMatch >= hash_bits
+        hash_shift * min_match >= hash_bits
     */
     uInt hash_shift_;
 
@@ -348,18 +348,18 @@ protected:
     int nice_match_;                // Stop searching when current match exceeds this
 
     ct_data dyn_ltree_[
-        HEAP_SIZE];                 // literal and length tree
+        heap_size];                 // literal and length tree
     ct_data dyn_dtree_[
-        2*dCodes+1];                // distance tree
+        2 * dcodes + 1];                // distance tree
     ct_data bl_tree_[
-        2*blCodes+1];               // Huffman tree for bit lengths
+        2 * bl_codes + 1];               // Huffman tree for bit lengths
 
     tree_desc l_desc_;              // desc. for literal tree
     tree_desc d_desc_;              // desc. for distance tree
     tree_desc bl_desc_;             // desc. for bit length tree
 
     // number of codes at each bit length for an optimal tree
-    std::uint16_t bl_count_[maxBits+1];
+    std::uint16_t bl_count_[max_bits + 1];
 
     // Index within the heap array of least frequent node in the Huffman tree
     static std::size_t constexpr kSmallest = 1;
@@ -368,12 +368,12 @@ protected:
         heap[0] is not used. The same heap array is used to build all trees.
     */
 
-    int heap_[2*lCodes+1];          // heap used to build the Huffman trees
+    int heap_[2 * lcodes + 1];          // heap used to build the Huffman trees
     int heap_len_;                  // number of elements in the heap
     int heap_max_;                  // element of largest frequency
 
     // Depth of each subtree used as tie breaker for trees of equal frequency
-    std::uint8_t depth_[2*lCodes+1];
+    std::uint8_t depth_[2 * lcodes + 1];
 
     std::uint8_t *l_buf_;           // buffer for literals or lengths
 
@@ -439,7 +439,7 @@ protected:
     std::size_t
     max_dist() const
     {
-        return w_size_ - kMinLookahead;
+        return w_size_ - kmin_lookahead;
     }
 
     void
@@ -482,12 +482,12 @@ protected:
     void
     send_bits(int value, int length)
     {
-        if(bi_valid_ > (int)Buf_size - length)
+        if(bi_valid_ > (int)buf_size - length)
         {
             bi_buf_ |= (std::uint16_t)value << bi_valid_;
             put_short(bi_buf_);
-            bi_buf_ = (std::uint16_t)value >> (Buf_size - bi_valid_);
-            bi_valid_ += length - Buf_size;
+            bi_buf_ = (std::uint16_t)value >> (buf_size - bi_valid_);
+            bi_valid_ += length - buf_size;
         }
         else
         {
@@ -556,14 +556,14 @@ protected:
         If this file is compiled with -DFASTEST, the compression level
         is forced to 1, and no hash chains are maintained.
         IN  assertion: all calls to to INSERT_STRING are made with
-            consecutive input characters and the first minMatch
-            bytes of str are valid (except for the last minMatch-1
+            consecutive input characters and the first min_match
+            bytes of str are valid (except for the last min_match-1
             bytes of the input file).
     */
     void
     insert_string(IPos& hash_head)
     {
-        update_hash(ins_h_, window_[strstart_ + (minMatch-1)]);
+        update_hash(ins_h_, window_[strstart_ + (min_match - 1)]);
         hash_head = prev_[strstart_ & w_mask_] = head_[ins_h_];
         head_[ins_h_] = (std::uint16_t)strstart_;
     }
@@ -641,7 +641,7 @@ protected:
     lut_type const&
     get_lut();
 
-    BOOST_DEFLATE_DECL void doReset             (int level, int windowBits, int memLevel, Strategy strategy, Wrap wrap);
+    BOOST_DEFLATE_DECL void doReset             (int level, int windowBits, int memLevel, Strategy strategy, wrap wrap);
     BOOST_DEFLATE_DECL void doReset             ();
     BOOST_DEFLATE_DECL void doClear             ();
     BOOST_DEFLATE_DECL std::size_t doUpperBound (std::size_t sourceLen) const;
