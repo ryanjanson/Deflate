@@ -32,16 +32,22 @@ optional<std::string> easy_compress(string_view in, wrap wrapping) {
 
     while(zp.avail_in > 0) {
         ds.write(zp, Flush::full, ec);
-        if(ec && ec != error::need_buffers)
+
+        if(ec == error::need_buffers) {
+            if (zp.avail_out == 0) {
+                out.resize(out.size() * growth_factor);
+                zp.next_out = &out[zp.total_out];
+                zp.avail_out = out.size();
+            } else {
+                // then zp.avail_in is zero
+                return {};
+            }
+        } else if(ec == error::end_of_stream)
+            break;
+        else if(ec)
             return {};
-
-        out.resize(out.size() * growth_factor);
-        zp.next_out = &out[zp.total_out];
-        zp.avail_out = out.size();
     }
-
-    if(ec)
-        return {};
+    out.resize(zp.total_out);
     return out;
 }
 
@@ -61,13 +67,22 @@ optional<std::string> easy_uncompress(string_view in, wrap wrapping) {
 
     while(zp.avail_in > 0) {
         is.write(zp, Flush::full, ec);
-        if(ec && ec != error::need_buffers)
-            return {};
 
-        out.resize(out.size() * growth_factor);
-        zp.next_out = &out[zp.total_out];
-        zp.avail_out = out.size();
+        if(ec == error::need_buffers) {
+            if (zp.avail_out == 0) {
+                out.resize(out.size() * growth_factor);
+                zp.next_out = &out[zp.total_out];
+                zp.avail_out = out.size();
+            } else {
+                // then zp.avail_in is zero
+                return {};
+            }
+        } else if(ec == error::end_of_stream)
+            break;
+        else if(ec)
+            return {};
     }
+    out.resize(zp.total_out);
     return out;
 }
 
