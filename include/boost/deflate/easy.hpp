@@ -28,4 +28,8 @@ optional<std::string> easy_uncompress(string_view in, wrap wrapping = boost::def
 }
 }
 
+#ifdef BOOST_DEFLATE_HEADER_ONLY
+#include <boost/deflate/detail/easy.ipp>
+#endif // BOOST_DEFLATE_HEADER_ONLY
+
 #endif //BOOST_DEFLATE_EASY_HPP
