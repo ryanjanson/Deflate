@@ -37,7 +37,7 @@ optional<std::string> easy_compress(string_view in, wrap wrapping) {
             if (zp.avail_out == 0) {
                 out.resize(out.size() * growth_factor);
                 zp.next_out = &out[zp.total_out];
-                zp.avail_out = out.size();
+                zp.avail_out = out.size() - zp.total_out;
             } else {
                 // then zp.avail_in is zero
                 return {};
@@ -72,7 +72,7 @@ optional<std::string> easy_uncompress(string_view in, wrap wrapping) {
             if (zp.avail_out == 0) {
                 out.resize(out.size() * growth_factor);
                 zp.next_out = &out[zp.total_out];
-                zp.avail_out = out.size();
+                zp.avail_out = out.size() - zp.total_out;
             } else {
                 // then zp.avail_in is zero
                 return {};
